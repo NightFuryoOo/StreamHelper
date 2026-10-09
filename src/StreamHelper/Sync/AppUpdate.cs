@@ -7,7 +7,7 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Sync;
 
-public sealed record UpdateAsset(string Name, string Url, long Size);
+public sealed record UpdateAsset(string Name, string Url, long Size, string? Digest = null);
 
 public sealed record UpdateRelease(Version Version, string Tag, string Name, string Notes, string PageUrl, UpdateAsset? Exe, UpdateAsset? Checksum);
 
@@ -50,13 +50,21 @@ public static class AppUpdate
                 var url = Text(asset, "browser_download_url");
                 if (url.Length == 0) continue;
                 var size = asset.TryGetProperty("size", out var s) && s.TryGetInt64(out var n) ? n : 0;
-                assets.Add(new UpdateAsset(Text(asset, "name"), url, size));
+                assets.Add(new UpdateAsset(Text(asset, "name"), url, size, ParseDigest(Text(asset, "digest"))));
             }
         }
 
         return new UpdateRelease(
             version, tag, Text(root, "name"), CleanNotes(Text(root, "body")), Text(root, "html_url"),
             Find(assets, ExeAsset), Find(assets, ChecksumAsset));
+    }
+
+    public static string? ParseDigest(string digest)
+    {
+        const string prefix = "sha256:";
+        if (!digest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return null;
+        var hex = digest[prefix.Length..].Trim();
+        return Regex.IsMatch(hex, "^[0-9A-Fa-f]{64}$") ? hex.ToUpperInvariant() : null;
     }
 
     public static string? ParseChecksum(string text)

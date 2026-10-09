@@ -16,7 +16,7 @@ public class AppUpdateTests
           "prerelease": false,
           "body": "## Что нового\r\n\r\n\r\n- **Переименование** наград\r\n- Исправления\r\n",
           "assets": [
-            { "name": "streamhelper.exe", "size": 68826175, "browser_download_url": "https://github.com/x/StreamHelper.exe" },
+            { "name": "streamhelper.exe", "size": 68826175, "digest": "sha256:ec3bf0871540301914310bdb4dd204ca05b44e32bd12b8176a8d3ae9eed9145e", "browser_download_url": "https://github.com/x/StreamHelper.exe" },
             { "name": "StreamHelper.exe.sha256", "size": 84, "browser_download_url": "https://github.com/x/StreamHelper.exe.sha256" },
             { "name": "notes.txt", "size": 1, "browser_download_url": "https://github.com/x/notes.txt" }
           ]
@@ -68,6 +68,19 @@ public class AppUpdateTests
         Assert.Equal("https://github.com/x/StreamHelper.exe", release.Exe!.Url);
         Assert.Equal(68826175, release.Exe.Size);
         Assert.Equal("https://github.com/x/StreamHelper.exe.sha256", release.Checksum!.Url);
+        Assert.Equal("EC3BF0871540301914310BDB4DD204CA05B44E32BD12B8176A8D3AE9EED9145E", release.Exe.Digest);
+        Assert.Null(release.Checksum.Digest);
+    }
+
+    [Theory]
+    [InlineData("sha256:ec3bf0871540301914310bdb4dd204ca05b44e32bd12b8176a8d3ae9eed9145e", "EC3BF0871540301914310BDB4DD204CA05B44E32BD12B8176A8D3AE9EED9145E")]
+    [InlineData("SHA256:EC3BF0871540301914310BDB4DD204CA05B44E32BD12B8176A8D3AE9EED9145E", "EC3BF0871540301914310BDB4DD204CA05B44E32BD12B8176A8D3AE9EED9145E")]
+    [InlineData("sha512:ec3bf0871540301914310bdb4dd204ca05b44e32bd12b8176a8d3ae9eed9145e", null)]
+    [InlineData("sha256:1234", null)]
+    [InlineData("", null)]
+    public void GitHub_digests_give_the_sha256_of_the_file(string digest, string? expected)
+    {
+        Assert.Equal(expected, AppUpdate.ParseDigest(digest));
     }
 
     [Theory]

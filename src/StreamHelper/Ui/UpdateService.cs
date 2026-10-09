@@ -158,17 +158,20 @@ public sealed class UpdateService : INotifyPropertyChanged
                 SetStatus($"В релизе нет файла {AppUpdate.ExeAsset}.", true);
                 return;
             }
-            if (release.Checksum == null)
+            using var cts = new CancellationTokenSource(DownloadLimit);
+            var expected = release.Exe.Digest;
+            if (expected == null && release.Checksum != null)
             {
-                SetStatus($"В релизе нет файла {AppUpdate.ChecksumAsset}: без проверки обновлять нельзя.", true);
+                expected = AppUpdate.ParseChecksum(await _download.GetStringAsync(release.Checksum.Url, cts.Token));
+            }
+            if (expected == null)
+            {
+                SetStatus("У файла обновления нет контрольной суммы: без проверки обновлять нельзя.", true);
                 return;
             }
 
             target = UpdateInstaller.NewPath(_exePath);
             SetStatus("Скачиваю обновление…", false);
-            using var cts = new CancellationTokenSource(DownloadLimit);
-            var expected = AppUpdate.ParseChecksum(await _download.GetStringAsync(release.Checksum.Url, cts.Token))
-                           ?? throw new InvalidDataException("в файле контрольной суммы нет SHA-256");
             var progress = new Progress<int>(percent => SetStatus($"Скачиваю обновление: {percent}%", false));
             var actual = await UpdateInstaller.DownloadAsync(_download, release.Exe.Url, target, progress, cts.Token);
             UpdateInstaller.Verify(actual, expected);

@@ -26,12 +26,4 @@
   <ItemGroup>
     <InternalsVisibleTo Include="StreamHelper.Tests" />
   </ItemGroup>
-
-  <Target Name="WriteReleaseChecksum" AfterTargets="Publish" Condition="'$(PublishSingleFile)' == 'true'">
-    <GetFileHash Files="$(PublishDir)$(AssemblyName).exe" Algorithm="SHA256">
-      <Output TaskParameter="Hash" PropertyName="ReleaseExeHash" />
-    </GetFileHash>
-    <WriteLinesToFile File="$(PublishDir)$(AssemblyName).exe.sha256" Lines="$(ReleaseExeHash)  $(AssemblyName).exe" Overwrite="true" />
-  </Target>
-
 </Project>
