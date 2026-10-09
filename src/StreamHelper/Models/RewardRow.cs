@@ -8,11 +8,14 @@ public sealed class RewardRow : INotifyPropertyChanged
     private bool _shown;
     private bool _busy;
     private bool _confirming;
+    private bool _renaming;
+    private string _title;
+    private string _editText = "";
 
     public RewardRow(string id, string title, long cost, bool enabled, bool own, bool canManage, int pendingCount, bool shown)
     {
         Id = id;
-        Title = title;
+        _title = title;
         Cost = cost;
         Own = own;
         CanManage = canManage;
@@ -22,7 +25,24 @@ public sealed class RewardRow : INotifyPropertyChanged
     }
 
     public string Id { get; }
-    public string Title { get; }
+
+    public string Title
+    {
+        get => _title;
+        set
+        {
+            if (_title == value) return;
+            _title = value;
+            Raise(nameof(Title));
+            Raise(nameof(Name));
+            Raise(nameof(DisplayText));
+            Raise(nameof(ConfirmText));
+            Raise(nameof(SwitchName));
+            Raise(nameof(DeleteName));
+            Raise(nameof(RenameName));
+        }
+    }
+
     public long Cost { get; }
     public bool Own { get; }
     public bool TwitchMade => !Own;
@@ -42,6 +62,33 @@ public sealed class RewardRow : INotifyPropertyChanged
     public string SwitchName => _enabled ? $"Выключить «{Name}» на канале" : $"Включить «{Name}» на канале";
 
     public string DeleteName => $"Удалить «{Name}»";
+
+    public string RenameName => $"Переименовать «{Name}»";
+
+    public bool Renaming
+    {
+        get => _renaming;
+        set
+        {
+            if (_renaming == value) return;
+            _renaming = value;
+            Raise(nameof(Renaming));
+            Raise(nameof(NotRenaming));
+        }
+    }
+
+    public bool NotRenaming => !_renaming;
+
+    public string EditText
+    {
+        get => _editText;
+        set
+        {
+            if (_editText == value) return;
+            _editText = value;
+            Raise(nameof(EditText));
+        }
+    }
 
     public bool Enabled
     {

@@ -1,12 +1,13 @@
+using System;
+
 namespace StreamHelper.Storage;
 
 public static class AppVersion
 {
-    public static string Current { get; } = Read();
+    public static Version Value { get; } = Normalize(typeof(AppVersion).Assembly.GetName().Version);
 
-    private static string Read()
-    {
-        var version = typeof(AppVersion).Assembly.GetName().Version;
-        return version == null ? "0.0.0" : $"{version.Major}.{version.Minor}.{System.Math.Max(version.Build, 0)}";
-    }
+    public static string Current { get; } = Value.ToString(4);
+
+    public static Version Normalize(Version? version) =>
+        version == null ? new Version(0, 0, 0, 0) : new Version(version.Major, version.Minor, Math.Max(version.Build, 0), Math.Max(version.Revision, 0));
 }

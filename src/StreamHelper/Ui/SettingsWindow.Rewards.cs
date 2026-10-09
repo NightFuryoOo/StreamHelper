@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using StreamHelper.Api;
 using StreamHelper.Models;
 using StreamHelper.Storage;
@@ -21,6 +22,7 @@ public partial class SettingsWindow
     private HashSet<string> _managedIdSet = new();
     private bool _managedLoaded;
     private bool _rewardSectionBusy;
+    private RewardRow? _renamingRow;
 
     private void InitRewards(AppSettings settings)
     {
@@ -188,6 +190,7 @@ public partial class SettingsWindow
     private void RefreshRewardRows(string? problem = null)
     {
         var settings = _services.Settings.Current;
+        _renamingRow = null;
         _rewardRows.Clear();
         if (problem == null)
         {
@@ -241,6 +244,98 @@ public partial class SettingsWindow
         {
             reward.Busy = false;
         }
+    }
+
+    private static RewardRow? RowOf(object sender) => ((FrameworkElement)sender).DataContext as RewardRow;
+
+    private void OnRenameRewardClick(object sender, RoutedEventArgs e)
+    {
+        if (RowOf(sender) is not { CanManage: true, Busy: false } row) return;
+        if (_renamingRow != null && _renamingRow != row) _renamingRow.Renaming = false;
+        row.EditText = row.Name;
+        row.Renaming = true;
+        _renamingRow = row;
+    }
+
+    private void OnRenameRewardBoxVisible(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not TextBox { IsVisible: true } box) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+        {
+            box.Focus();
+            box.SelectAll();
+        }));
+    }
+
+    private void OnRenameRewardKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            CancelRename(RowOf(sender));
+        }
+        else if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            _ = SaveRenameAsync(RowOf(sender));
+        }
+    }
+
+    private void OnCancelRenameReward(object sender, RoutedEventArgs e) => CancelRename(RowOf(sender));
+
+    private async void OnConfirmRenameReward(object sender, RoutedEventArgs e) => await SaveRenameAsync(RowOf(sender));
+
+    private void CancelRename(RewardRow? row)
+    {
+        if (row == null) return;
+        row.Renaming = false;
+        if (_renamingRow == row) _renamingRow = null;
+    }
+
+    private async Task SaveRenameAsync(RewardRow? row)
+    {
+        if (row == null || row.Busy || !row.Renaming) return;
+        var others = _allRewards.Where(r => r.Id != row.Id).Select(r => r.Title).ToList();
+        var oldName = row.Name;
+        row.Busy = true;
+        try
+        {
+            var result = await RewardRename.RunAsync(_services.Twitch, row.Id, row.Title, row.EditText, others, CancellationToken.None);
+            if (!result.Success)
+            {
+                RewardsSyncStatus.Text = $"«{oldName}»: {result.Message}";
+                return;
+            }
+            CancelRename(row);
+            if (result.Title == row.Title) return;
+            row.Title = result.Title;
+            RememberTitle(row.Id, result.Title);
+            RewardsSyncStatus.Text = $"«{oldName}» теперь называется «{row.Name}».";
+        }
+        catch (AuthRequiredException ex)
+        {
+            RewardsSyncStatus.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Renaming a reward failed: " + ex.Message);
+            RewardsSyncStatus.Text = $"«{oldName}»: не получилось: {ex.Message}";
+        }
+        finally
+        {
+            row.Busy = false;
+        }
+    }
+
+    private void RememberTitle(string rewardId, string title)
+    {
+        var index = _allRewards.FindIndex(r => r.Id == rewardId);
+        if (index >= 0) _allRewards[index] = _allRewards[index] with { Title = title };
+        if (_managedInfos.TryGetValue(rewardId, out var info)) _managedInfos[rewardId] = info with { Title = title };
+        var sound = _soundCandidates.FindIndex(r => r.Id == rewardId);
+        if (sound < 0) return;
+        _soundCandidates[sound] = _soundCandidates[sound] with { Title = title };
+        RebuildSoundLists(_soundPicked?.Id);
     }
 
     private void OnDeleteManagedClick(object sender, RoutedEventArgs e)

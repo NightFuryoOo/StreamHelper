@@ -107,6 +107,15 @@ public sealed record RedemptionUpdateResult(RedemptionUpdateOutcome Outcome, str
 
 public sealed record RewardToggleResult(bool Success, string Message);
 
+public enum RewardRenameOutcome
+{
+    Renamed,
+    TitleTaken,
+    Failed,
+}
+
+public sealed record RewardRenameResult(RewardRenameOutcome Outcome, string Message);
+
 public interface IRewardApi
 {
     Task<IReadOnlyList<RewardInfo>> GetRewardsAsync(CancellationToken ct);
@@ -120,6 +129,8 @@ public interface IRewardApi
     Task<RewardCreateResult> CreateRewardAsync(RewardInfo template, string title, CancellationToken ct);
 
     Task<RewardToggleResult> SetRewardEnabledAsync(string rewardId, bool enabled, CancellationToken ct);
+
+    Task<RewardRenameResult> SetRewardTitleAsync(string rewardId, string title, CancellationToken ct);
 
     Task<RedemptionUpdateResult> UpdateRedemptionAsync(
         string rewardId, string redemptionId, RedemptionDecision decision, CancellationToken ct);
@@ -541,6 +552,28 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
             HttpStatusCode.Unauthorized => throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужно право channel:manage:redemptions)."),
             (HttpStatusCode)429 => new RewardToggleResult(false, "Twitch: слишком много запросов, попробуй через минуту."),
             _ => new RewardToggleResult(false, $"Twitch: HTTP {(int)status}. {message}".Trim()),
+        };
+    }
+
+    public async Task<RewardRenameResult> SetRewardTitleAsync(string rewardId, string title, CancellationToken ct)
+    {
+        RequireManageScope();
+        var url = $"{_endpoints.RewardsUrl}?broadcaster_id={Uri.EscapeDataString(Settings.TwitchUserId)}&id={Uri.EscapeDataString(rewardId)}";
+        var json = JsonSerializer.Serialize(new Dictionary<string, object> { ["title"] = title });
+        var (status, response) = await CallWithRefreshAsync((token, c) => SendJsonAsync(HttpMethod.Patch, url, token, json, c), ct);
+
+        var message = ReadMessage(response);
+        return status switch
+        {
+            HttpStatusCode.OK => new RewardRenameResult(RewardRenameOutcome.Renamed, ""),
+            HttpStatusCode.BadRequest when message.Contains("DUPLICATE", StringComparison.OrdinalIgnoreCase) =>
+                new RewardRenameResult(RewardRenameOutcome.TitleTaken, message),
+            HttpStatusCode.BadRequest => new RewardRenameResult(RewardRenameOutcome.Failed, $"Twitch не принял название: {message}".Trim()),
+            HttpStatusCode.NotFound => new RewardRenameResult(RewardRenameOutcome.Failed, "Этой награды уже нет на канале."),
+            HttpStatusCode.Forbidden => new RewardRenameResult(RewardRenameOutcome.Failed, "Twitch разрешает менять эту награду только там, где её создали."),
+            HttpStatusCode.Unauthorized => throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужно право channel:manage:redemptions)."),
+            (HttpStatusCode)429 => new RewardRenameResult(RewardRenameOutcome.Failed, "Twitch: слишком много запросов, попробуй через минуту."),
+            _ => new RewardRenameResult(RewardRenameOutcome.Failed, $"Twitch: HTTP {(int)status}. {message}".Trim()),
         };
     }
 

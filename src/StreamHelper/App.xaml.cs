@@ -25,6 +25,7 @@ public partial class App : Application
     private Services? _services;
     private TrayIcon? _tray;
     private string[] _args = Array.Empty<string>();
+    private readonly string? _exePath = Environment.ProcessPath;
 
     private const string RestartFlag = "--restarted";
 
@@ -85,6 +86,12 @@ public partial class App : Application
         services.RewardAlert.MutedChanged += _ => services.MuteBadge.Apply(services.RewardAlert.Muted);
         services.MuteBadge.Apply(services.RewardAlert.Muted);
         _ = services.RefreshManagedRewardsAsync();
+        if (_exePath != null) _ = UpdateInstaller.CleanUpSoonAsync(_exePath);
+        if (UpdateInstaller.TakeMarker(AppPaths.Directory) == AppVersion.Current)
+        {
+            services.Toasts.Show("StreamHelper обновлён", "Версия " + AppVersion.Current, null);
+        }
+        services.Updates.Start();
 
         if (showAtStart) services.Overlay.ShowOverlay();
         if (imported != null)
@@ -158,6 +165,9 @@ public partial class App : Application
             RewardAlert = new RewardAlertService(settings),
             MuteBadge = new MuteBadgeService(settings),
             ViewModel = viewModel,
+            Updates = new UpdateService(
+                _http, Environment.GetEnvironmentVariable("STREAMHELPER_GITHUB_API"), AppVersion.Value, _exePath,
+                UpdateInstaller.IsInstallable(_exePath, AppContext.BaseDirectory, "StreamHelper"), AppPaths.Directory, Restart),
         };
         services.Overlay = new MainWindow(services);
         services.HandleDonations = OnDonations;
@@ -242,7 +252,7 @@ public partial class App : Application
 
     private bool Restart()
     {
-        var exe = Environment.ProcessPath;
+        var exe = _exePath;
         if (string.IsNullOrEmpty(exe)) return false;
         var start = new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = false };
         foreach (var arg in _args.Where(a => a != RestartFlag)) start.ArgumentList.Add(arg);
@@ -256,7 +266,7 @@ public partial class App : Application
             Log.Write("Restart failed: " + ex.Message);
             return false;
         }
-        Log.Write("Restarting to load a profile.");
+        Log.Write("Restarting.");
         _services?.Overlay.SaveBounds();
         Shutdown();
         return true;
@@ -284,6 +294,7 @@ public partial class App : Application
         _services?.Chat.Close();
         _services?.RewardAlert.Stop();
         _services?.MuteBadge.Close();
+        _services?.Updates.Stop();
         _tray?.Dispose();
         _http?.Dispose();
         try

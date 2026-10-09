@@ -27,6 +27,7 @@ public sealed class Services
     public required RewardAlertService RewardAlert { get; init; }
     public required MuteBadgeService MuteBadge { get; init; }
     public required MainViewModel ViewModel { get; init; }
+    public required UpdateService Updates { get; init; }
 
     public DonationPoller Poller { get; set; } = null!;
     public DonatePayPoller DonatePayPoller { get; set; } = null!;
