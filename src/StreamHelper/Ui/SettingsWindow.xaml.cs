@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _services = services;
+        UpdateBannerView.DataContext = services.Updates;
 
         var settings = services.Settings.Current;
         InitHotkeys(settings);

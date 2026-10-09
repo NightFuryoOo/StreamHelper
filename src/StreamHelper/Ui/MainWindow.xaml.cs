@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _services = services;
         DataContext = services.ViewModel;
+        UpdateBannerView.DataContext = services.Updates;
         ApplySavedBounds();
         Deactivated += (_, _) =>
         {
