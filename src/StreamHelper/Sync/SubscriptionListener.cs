@@ -20,7 +20,8 @@ public sealed class SubscriptionListener : EventSubListener<Subscriber>
         "Подписки",
         TwitchClient.SubscriptionScope,
         SubscriptionTypes,
-        "Для подписок переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.");
+        "Для подписок переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.",
+        OptionalTypes: new[] { new EventSubOptionalType(EventSubParser.BitsUseType, TwitchClient.BitsScope) });
 
     public SubscriptionListener(SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<Subscriber>, Task> deliver)
         : base(settings, api, url, Feature, deliver)

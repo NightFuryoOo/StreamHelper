@@ -16,6 +16,7 @@ public enum HotkeyAction
     ChatToggle,
     RewardSoundsMute,
     Moments,
+    ChatWrite,
 }
 
 public sealed class HotkeyBinding
@@ -25,6 +26,13 @@ public sealed class HotkeyBinding
 
     [JsonIgnore]
     public bool IsSet => VirtualKey != 0;
+}
+
+public static class MainTabs
+{
+    public static readonly string[] Keys = { "Donations", "Followers", "Subscribers", "Rewards", "Pings", "Moments" };
+
+    public static readonly string[] Titles = { "Донаты", "Фолловеры", "Подписки", "Награды", "Пинги", "Рейды и стрики" };
 }
 
 public static class HotkeyActions
@@ -44,6 +52,7 @@ public static class HotkeyActions
         HotkeyAction.ChatToggle => "Чат: показать / скрыть",
         HotkeyAction.RewardSoundsMute => "Звуки наград: выкл / вкл",
         HotkeyAction.Moments => "Рейды и стрики",
+        HotkeyAction.ChatWrite => "Чат: написать сообщение",
         _ => action.ToString(),
     };
 

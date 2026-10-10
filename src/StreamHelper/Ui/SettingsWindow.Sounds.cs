@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using StreamHelper.Api;
 using StreamHelper.Models;
 using StreamHelper.Storage;
@@ -24,6 +25,42 @@ public partial class SettingsWindow
     {
         RewardSoundList.ItemsSource = _soundRewards;
         RewardSoundAvailableList.ItemsSource = _soundAvailable;
+        RewardAlertHotkeyBox.TextChanged += (_, _) => UpdateResetCross(RewardAlertHotkeyBox);
+        RewardAlertHotkeyBox.GotKeyboardFocus += (_, _) => _services.Hotkey.UnregisterAll();
+        RewardAlertHotkeyBox.LostKeyboardFocus += (_, _) => ApplyHotkeys();
+    }
+
+    private string HotkeyKeyOf(string rewardId) => AppSettings.RewardHotkeyKey(_services.RewardAlert.KeyOf(rewardId));
+
+    private string RewardHotkeyText(string rewardId)
+    {
+        var binding = _services.Settings.Current.GetHotkey(HotkeyKeyOf(rewardId));
+        return binding.IsSet ? HotkeyService.Describe(binding) : "";
+    }
+
+    private void OnRewardHotkeyKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_soundPicked == null || _services.RewardAlert.SoundOf(_soundPicked.Id) == null)
+        {
+            e.Handled = true;
+            return;
+        }
+        if (CaptureHotkey(RewardAlertHotkeyBox, e, HotkeyKeyOf(_soundPicked.Id), RewardHotkeyHint))
+        {
+            _soundPicked.HotkeyText = RewardHotkeyText(_soundPicked.Id);
+        }
+    }
+
+    private void OnResetRewardHotkey(object sender, RoutedEventArgs e)
+    {
+        Keyboard.ClearFocus();
+        if (_soundPicked == null) return;
+        _services.Settings.Current.SetHotkey(HotkeyKeyOf(_soundPicked.Id), 0, 0);
+        _services.Settings.Save();
+        _soundPicked.HotkeyText = "";
+        ShowLine(RewardHotkeyHint, "");
+        RefreshRewardAlert();
+        ApplyHotkeys();
     }
 
     private static string SoundLabel(RewardSound? sound) =>
@@ -95,7 +132,10 @@ public partial class SettingsWindow
                 _soundAvailable.Add(new RewardSoundChoice(reward.Id, reward.Title, ""));
                 continue;
             }
-            var choice = new RewardSoundChoice(reward.Id, reward.Title, SoundLabel(_services.RewardAlert.SoundOf(reward.Id)));
+            var choice = new RewardSoundChoice(reward.Id, reward.Title, SoundLabel(_services.RewardAlert.SoundOf(reward.Id)))
+            {
+                HotkeyText = RewardHotkeyText(reward.Id),
+            };
             if (reward.Id == pickedId)
             {
                 choice.Picked = true;
@@ -134,6 +174,7 @@ public partial class SettingsWindow
         var sound = _services.RewardAlert.SoundOf(choice.Id);
         var missing = sound != null && _services.RewardAlert.PathOf(choice.Id) == null;
         ShowLine(RewardAlertStatus, missing ? "Файл пропал, выбери заново." : "");
+        ShowLine(RewardHotkeyHint, "");
         RefreshRewardAlert();
     }
 
@@ -148,6 +189,8 @@ public partial class SettingsWindow
         RewardAlertTestButton.IsEnabled = playable;
         RewardAlertClearButton.IsEnabled = id != null;
         RewardAlertVolumeSlider.IsEnabled = sound != null;
+        RewardAlertHotkeyBox.IsEnabled = sound != null;
+        RewardAlertHotkeyBox.Text = HotkeyService.Describe(id == null || sound == null ? new HotkeyBinding() : _services.Settings.Current.GetHotkey(HotkeyKeyOf(id)));
 
         _syncingSound = true;
         try
@@ -184,7 +227,9 @@ public partial class SettingsWindow
         _services.Settings.Current.SoundRewardIds.Remove(id);
         _services.Settings.Save();
         ShowLine(RewardAlertStatus, "");
+        ShowLine(RewardHotkeyHint, "");
         RebuildSoundLists(null);
+        ApplyHotkeys();
         _ = _services.RewardMute.SyncAsync();
     }
 

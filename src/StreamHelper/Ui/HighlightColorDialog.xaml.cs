@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using StreamHelper.Models;
 
 namespace StreamHelper.Ui;
 
@@ -123,7 +124,7 @@ public partial class HighlightColorDialog : Window
 
     private void SetColor(string hex)
     {
-        var (r, g, b) = ChatHighlights.Parse(hex);
+        var (r, g, b) = HexColor.Parse(hex);
         var (h, s, v) = ChatHighlights.ToHsv(r, g, b);
         if (s > 0 && v > 0) _h = h;
         _s = s;
@@ -162,13 +163,13 @@ public partial class HighlightColorDialog : Window
     {
         if (_syncing) return;
         ErrorText.Visibility = Visibility.Collapsed;
-        var hex = ChatHighlights.Normalize(HexBox.Text);
+        var hex = HexColor.Normalize(HexBox.Text);
         if (hex == null)
         {
             Preview.Background = Brushes.Transparent;
             return;
         }
-        var (r, g, b) = ChatHighlights.Parse(hex);
+        var (r, g, b) = HexColor.Parse(hex);
         var (h, s, v) = ChatHighlights.ToHsv(r, g, b);
         if (s > 0 && v > 0) _h = h;
         _s = s;
@@ -178,7 +179,7 @@ public partial class HighlightColorDialog : Window
 
     private void OnOk(object sender, RoutedEventArgs e)
     {
-        var hex = ChatHighlights.Normalize(HexBox.Text);
+        var hex = HexColor.Normalize(HexBox.Text);
         if (hex == null)
         {
             ErrorText.Visibility = Visibility.Visible;

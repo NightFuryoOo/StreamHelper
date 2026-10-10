@@ -378,6 +378,7 @@ public class ChatThroughPingListenerTests
 
             Assert.Equal(new[] { "m1", "m2", "m3" }, feed.Recent().Select(m => m.MessageId).ToArray());
             Assert.Equal("#00FF7F", feed.Recent()[0].Color);
+            Assert.Equal(new[] { true, false, false }, feed.Recent().Select(m => m.IsPing).ToArray());
             lock (pings) Assert.Equal(new[] { "m1" }, pings.ToArray());
         }
         finally

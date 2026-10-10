@@ -17,6 +17,7 @@ public sealed class ChatOverlayService : IPositionable
     private readonly ChatEmotes _emotes;
     private readonly IVoteApi _votes;
     private readonly VoteWatcher _watcher;
+    private readonly IChatSendApi _chatSend;
     private ChatOverlayWindow? _window;
     private ChatHistoryWindow? _history;
     private IntPtr _historyReturnTo;
@@ -24,8 +25,9 @@ public sealed class ChatOverlayService : IPositionable
 
     public ChatOverlayService(
         SettingsStore settings, ChatFeed feed, ChatBadgeCatalog badges, IModerationApi moderation, IStreamApi streams, ChatEmotes emotes,
-        IVoteApi votes, VoteWatcher watcher)
+        IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend)
     {
+        _chatSend = chatSend;
         _votes = votes;
         _watcher = watcher;
         watcher.Changed += OnVotesChanged;
@@ -40,6 +42,14 @@ public sealed class ChatOverlayService : IPositionable
 
     public bool IsPositioning => _positioning;
 
+    public event Action<bool>? TypingChanged;
+
+    public void BeginTyping()
+    {
+        if (_positioning || _settings.Current.ChatHidden || _window is not { IsVisible: true, IsFadingOut: false }) return;
+        _window.BeginTyping();
+    }
+
     public void Apply()
     {
         if (!_settings.Current.ChatHidden || _positioning)
@@ -50,6 +60,7 @@ public sealed class ChatOverlayService : IPositionable
         }
         else
         {
+            _window?.EndTyping(returnFocus: true);
             _window?.SetInteractive(false);
             _window?.FadeOut();
         }
@@ -127,7 +138,8 @@ public sealed class ChatOverlayService : IPositionable
         if (_window != null) return _window;
         _ = _badges.EnsureLoadedAsync();
         _ = _emotes.EnsureCatalogAsync();
-        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher);
+        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend);
+        window.TypingChanged += typing => TypingChanged?.Invoke(typing);
         window.GeometryChanged += window.SaveGeometry;
         window.HistoryRequested += OnHistoryRequested;
         _window = window;

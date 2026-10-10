@@ -226,6 +226,7 @@ public class RewardMuteSwitchTests
         public Task<RewardCreateResult> CreateRewardAsync(RewardInfo template, string title, CancellationToken ct) => throw new NotSupportedException();
         public Task<RewardToggleResult> SetRewardEnabledAsync(string rewardId, bool enabled, CancellationToken ct) => throw new NotSupportedException();
         public Task<RewardRenameResult> SetRewardTitleAsync(string rewardId, string title, CancellationToken ct) => throw new NotSupportedException();
+        public Task<RewardToggleResult> UpdateRewardAsync(string rewardId, RewardInfo values, CancellationToken ct) => throw new NotSupportedException();
         public Task<RedemptionUpdateResult> UpdateRedemptionAsync(string rewardId, string redemptionId, RedemptionDecision decision, CancellationToken ct) =>
             throw new NotSupportedException();
     }

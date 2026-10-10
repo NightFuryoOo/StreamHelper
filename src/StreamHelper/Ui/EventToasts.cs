@@ -20,11 +20,19 @@ public static class EventToasts
     public static ToastText Followers(IReadOnlyList<Follower> added) =>
         new(added.Count == 1 ? "Новый фолловер" : $"Новых фолловеров: {added.Count}", added[^1].Name, null);
 
+    public static bool Notifies(AppSettings settings, Subscriber subscriber) =>
+        subscriber.IsBits ? settings.NotifyBits : settings.NotifySubscribers;
+
     public static ToastText Subscribers(IReadOnlyList<Subscriber> added)
     {
         var newest = added[^1];
         var line = string.IsNullOrEmpty(newest.DetailText) ? newest.Name : $"{newest.Name} · {newest.DetailText}";
-        return new ToastText(added.Count == 1 ? newest.ToastTitle : $"Новых подписок: {added.Count}", line, newest.Message);
+        var bits = added.Count(s => s.IsBits);
+        var title = added.Count == 1 ? newest.ToastTitle
+            : bits == added.Count ? $"Bits: {added.Count}"
+            : bits == 0 ? $"Новых подписок: {added.Count}"
+            : $"Подписок и Bits: {added.Count}";
+        return new ToastText(title, line, newest.Message);
     }
 
     public static ToastText Redemptions(IReadOnlyList<Redemption> added)

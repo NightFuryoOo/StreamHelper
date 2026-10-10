@@ -11,7 +11,11 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Sync;
 
-public sealed record EventSubFeature(string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage, bool FollowsChannel = false);
+public sealed record EventSubOptionalType(string Type, string Scope);
+
+public sealed record EventSubFeature(
+    string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage, bool FollowsChannel = false,
+    IReadOnlyList<EventSubOptionalType>? OptionalTypes = null);
 
 public abstract class EventSubListener<T> : ISyncWorker where T : class
 {
@@ -181,6 +185,7 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
                             {
                                 await _api.CreateSubscriptionAsync(type, message.SessionId, ct);
                             }
+                            await SubscribeOptionalAsync(message.SessionId, ct);
                             subscribed = true;
                             _failures = 0;
                             var now = _settings.Current;
@@ -209,6 +214,23 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         finally
         {
             current?.Dispose();
+        }
+    }
+
+    private async Task SubscribeOptionalAsync(string sessionId, CancellationToken ct)
+    {
+        if (_feature.OptionalTypes == null) return;
+        foreach (var optional in _feature.OptionalTypes)
+        {
+            if (!_settings.Current.HasScope(optional.Scope)) continue;
+            try
+            {
+                await _api.CreateSubscriptionAsync(optional.Type, sessionId, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Log.Write($"Twitch EventSub ({_feature.Label}): {optional.Type} is not available: " + ex.Message);
+            }
         }
     }
 

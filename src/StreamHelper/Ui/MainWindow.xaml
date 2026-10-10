@@ -337,7 +337,7 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
                                Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding KindText}" FontSize="12"
+                    <TextBlock x:Name="kind" Grid.Row="0" Grid.Column="1" Text="{Binding KindText}" FontSize="12"
                                Foreground="{StaticResource AccentBrush}" Margin="10,2,0,0"/>
                     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SubText}" FontSize="11"
                                Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
@@ -354,6 +354,9 @@
                 </DockPanel>
             </Border>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsBits}" Value="True">
+                    <Setter TargetName="kind" Property="Foreground" Value="#BF94FF"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsNew}" Value="True">
                     <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                 </DataTrigger>
@@ -467,7 +470,7 @@
                 </StackPanel>
                 <WrapPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5" Margin="-6,6,0,0">
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" AutomationProperties.Name="Донаты"
-                                 IsChecked="{Binding IsDonationsTab, Mode=TwoWay}">
+                                 IsChecked="{Binding IsDonationsTab, Mode=TwoWay}" Visibility="{Binding ShowDonationsTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Донаты"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Donations}">
@@ -476,7 +479,7 @@
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
-                                 AutomationProperties.Name="Фолловеры" IsChecked="{Binding IsFollowersTab, Mode=TwoWay}">
+                                 AutomationProperties.Name="Фолловеры" IsChecked="{Binding IsFollowersTab, Mode=TwoWay}" Visibility="{Binding ShowFollowersTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Фолловеры"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Followers}">
@@ -485,7 +488,7 @@
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
-                                 AutomationProperties.Name="Подписки" IsChecked="{Binding IsSubscribersTab, Mode=TwoWay}">
+                                 AutomationProperties.Name="Подписки" IsChecked="{Binding IsSubscribersTab, Mode=TwoWay}" Visibility="{Binding ShowSubscribersTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Подписки"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Subscribers}">
@@ -494,7 +497,7 @@
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
-                                 AutomationProperties.Name="Награды" IsChecked="{Binding IsRewardsTab, Mode=TwoWay}">
+                                 AutomationProperties.Name="Награды" IsChecked="{Binding IsRewardsTab, Mode=TwoWay}" Visibility="{Binding ShowRewardsTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Награды"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Redemptions}">
@@ -503,7 +506,7 @@
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
-                                 AutomationProperties.Name="Пинги" IsChecked="{Binding IsPingsTab, Mode=TwoWay}">
+                                 AutomationProperties.Name="Пинги" IsChecked="{Binding IsPingsTab, Mode=TwoWay}" Visibility="{Binding ShowPingsTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Пинги"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Pings}">
@@ -512,7 +515,7 @@
                         </StackPanel>
                     </RadioButton>
                     <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
-                                 AutomationProperties.Name="Рейды и стрики" IsChecked="{Binding IsMomentsTab, Mode=TwoWay}">
+                                 AutomationProperties.Name="Рейды и стрики" IsChecked="{Binding IsMomentsTab, Mode=TwoWay}" Visibility="{Binding ShowMomentsTab, Converter={StaticResource BoolVis}}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Рейды и стрики"/>
                             <Border Style="{StaticResource Badge}" DataContext="{Binding Moments}">

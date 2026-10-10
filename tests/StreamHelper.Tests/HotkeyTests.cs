@@ -83,10 +83,10 @@ public class HotkeyBindingTests
         var settings = new AppSettings();
         settings.SetHotkey(HotkeyAction.Rewards, AppSettings.ModControl | AppSettings.ModAlt, 0x71);
 
-        Assert.Equal(HotkeyAction.Rewards, settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x71, HotkeyAction.Donations));
-        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x71, HotkeyAction.Rewards));
-        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl, 0x71, HotkeyAction.Donations));
-        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x72, HotkeyAction.Donations));
+        Assert.Equal("Rewards", settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x71, "Donations"));
+        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x71, "Rewards"));
+        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl, 0x71, "Donations"));
+        Assert.Null(settings.FindHotkeyOwner(AppSettings.ModControl | AppSettings.ModAlt, 0x72, "Donations"));
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class HotkeyServiceTests
 
             var failed = service.RegisterAll(settings);
 
-            Assert.Equal(new[] { HotkeyAction.Settings }, failed);
+            Assert.Equal(new[] { "Settings" }, failed);
             Assert.True(service.IsRegistered(HotkeyAction.Followers));
             Assert.True(service.IsRegistered(HotkeyAction.Rewards));
             Assert.False(service.IsRegistered(HotkeyAction.Donations));
@@ -262,6 +262,80 @@ public class HotkeyServiceTests
             using var second = new HotkeyService();
             Assert.True(second.Register(HotkeyAction.Donations, All4, 0x82));
             Assert.True(second.Register(HotkeyAction.Rewards, All4, 0x83));
+        });
+    }
+
+    private static AppSettings WithSounds(params string[] rewardIds)
+    {
+        var settings = new AppSettings();
+        foreach (var id in rewardIds) settings.RewardSounds[id] = new RewardSound { File = "r-" + id + ".mp3", Name = id + ".mp3" };
+        return settings;
+    }
+
+    [Fact]
+    public void A_reward_key_reports_its_reward_when_pressed()
+    {
+        OnUiThread(() =>
+        {
+            using var service = new HotkeyService();
+            var settings = WithSounds("reward-a", "reward-b");
+            settings.SetHotkey(AppSettings.RewardHotkeyKey("reward-a"), All4, 0x84);
+            settings.SetHotkey(AppSettings.RewardHotkeyKey("reward-b"), All4, 0x85);
+            var pressed = new List<string>();
+            var actions = new List<HotkeyAction>();
+            service.RewardPressed += pressed.Add;
+            service.Pressed += actions.Add;
+
+            Assert.Empty(service.RegisterAll(settings));
+            SendMessage(service.Handle, WmHotkey, (IntPtr)service.IdOfReward("reward-b")!.Value, IntPtr.Zero);
+            SendMessage(service.Handle, WmHotkey, (IntPtr)service.IdOfReward("reward-a")!.Value, IntPtr.Zero);
+
+            Assert.Equal(new[] { "reward-b", "reward-a" }, pressed);
+            Assert.Empty(actions);
+        });
+    }
+
+    [Fact]
+    public void A_reward_key_taken_by_another_program_is_named_and_the_others_still_work()
+    {
+        OnUiThread(() =>
+        {
+            using var other = new HotkeyService();
+            Assert.True(other.Register(HotkeyAction.Donations, All4, 0x86));
+            using var service = new HotkeyService();
+            var settings = WithSounds("reward-a", "reward-b");
+            settings.SetHotkey(AppSettings.RewardHotkeyKey("reward-a"), All4, 0x86);
+            settings.SetHotkey(AppSettings.RewardHotkeyKey("reward-b"), All4, 0x87);
+
+            var failed = service.RegisterAll(settings);
+
+            Assert.Equal(new[] { AppSettings.RewardHotkeyKey("reward-a") }, failed);
+            Assert.False(service.IsRewardRegistered("reward-a"));
+            Assert.True(service.IsRewardRegistered("reward-b"));
+            Assert.False(service.IsFree(All4, 0x87));
+        });
+    }
+
+    [Fact]
+    public void Releasing_all_keys_also_releases_the_reward_keys_and_a_removed_sound_loses_its_key()
+    {
+        OnUiThread(() =>
+        {
+            using var service = new HotkeyService();
+            var settings = WithSounds("reward-a");
+            settings.SetHotkey(AppSettings.RewardHotkeyKey("reward-a"), All4, 0x84);
+            Assert.Empty(service.RegisterAll(settings));
+            Assert.False(service.IsFree(All4, 0x84));
+
+            service.UnregisterAll();
+            Assert.False(service.IsRewardRegistered("reward-a"));
+            Assert.True(service.IsFree(All4, 0x84));
+
+            Assert.Empty(service.RegisterAll(settings));
+            settings.RewardSounds.Remove("reward-a");
+            Assert.Empty(service.RegisterAll(settings));
+            Assert.False(service.IsRewardRegistered("reward-a"));
+            Assert.True(service.IsFree(All4, 0x84));
         });
     }
 }

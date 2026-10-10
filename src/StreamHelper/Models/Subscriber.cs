@@ -14,6 +14,26 @@ public enum SubscriptionKind
     New,
     Resub,
     Gift,
+    Bits,
+}
+
+public sealed class SubscriptionKindConverter : JsonConverter<SubscriptionKind>
+{
+    public override SubscriptionKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var number) && Enum.IsDefined(typeof(SubscriptionKind), number))
+        {
+            return (SubscriptionKind)number;
+        }
+        if (reader.TokenType == JsonTokenType.String && Enum.TryParse<SubscriptionKind>(reader.GetString(), true, out var named)) return named;
+        return SubscriptionKind.New;
+    }
+
+    public override void Write(Utf8JsonWriter writer, SubscriptionKind value, JsonSerializerOptions options)
+    {
+        if (value == SubscriptionKind.Bits) writer.WriteNumberValue((int)value);
+        else writer.WriteStringValue(value.ToString());
+    }
 }
 
 public sealed class Subscriber : ISeenItem, ISelectable
@@ -26,7 +46,7 @@ public sealed class Subscriber : ISeenItem, ISelectable
 
     public string Key { get; set; } = "";
 
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(SubscriptionKindConverter))]
     public SubscriptionKind Kind { get; set; }
 
     public string Login { get; set; } = "";
@@ -37,6 +57,8 @@ public sealed class Subscriber : ISeenItem, ISelectable
     public string Message { get; set; } = "";
     public int GiftTotal { get; set; }
     public bool IsAnonymous { get; set; }
+    public int Bits { get; set; }
+    public string PowerUp { get; set; } = "";
     public DateTime AtUtc { get; set; }
 
     public bool Seen
@@ -66,6 +88,8 @@ public sealed class Subscriber : ISeenItem, ISelectable
     [JsonIgnore] public bool CanSelect => true;
     [JsonIgnore] public bool IsNew => !_seen;
     [JsonIgnore] public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
+    [JsonIgnore] public bool IsBits => Kind == SubscriptionKind.Bits;
+    [JsonIgnore] public string BitsText => $"{Bits.ToString("N0", CultureInfo.GetCultureInfo("ru-RU"))} Bits";
 
     [JsonIgnore]
     public string Name =>
@@ -86,6 +110,7 @@ public sealed class Subscriber : ISeenItem, ISelectable
     {
         SubscriptionKind.Resub => "продление",
         SubscriptionKind.Gift => "подарил подписки",
+        SubscriptionKind.Bits => PowerUp.Length > 0 ? "Power-up" : "Bits",
         _ => "новая подписка",
     };
 
@@ -94,12 +119,14 @@ public sealed class Subscriber : ISeenItem, ISelectable
     {
         SubscriptionKind.Resub => "Продление подписки",
         SubscriptionKind.Gift => "Подарочные подписки",
+        SubscriptionKind.Bits => PowerUp.Length > 0 ? "Power-up за Bits" : "Bits",
         _ => "Новая подписка",
     };
 
     [JsonIgnore]
     public string DetailText => Kind switch
     {
+        SubscriptionKind.Bits => PowerUp.Length > 0 ? $"{BitsText} · {PowerUp}" : BitsText,
         SubscriptionKind.Gift => $"{TierText} · {GiftTotal} шт.".Trim(' ', '·'),
         SubscriptionKind.Resub => Months > 0
             ? (StreakMonths > 1 ? $"{TierText} · {Months} мес., подряд {StreakMonths}" : $"{TierText} · {Months} мес.")

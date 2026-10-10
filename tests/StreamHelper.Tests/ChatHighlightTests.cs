@@ -1,3 +1,4 @@
+using StreamHelper.Models;
 using StreamHelper.Storage;
 using StreamHelper.Ui;
 
@@ -13,7 +14,7 @@ public class ChatHighlightTests
     [InlineData("abc", "#AABBCC")]
     public void Colours_are_accepted_in_the_usual_spellings_and_kept_as_six_capital_digits(string typed, string expected)
     {
-        Assert.Equal(expected, ChatHighlights.Normalize(typed));
+        Assert.Equal(expected, HexColor.Normalize(typed));
     }
 
     [Theory]
@@ -29,15 +30,15 @@ public class ChatHighlightTests
     [InlineData("красный")]
     public void Anything_that_is_not_a_colour_is_refused(string? typed)
     {
-        Assert.Null(ChatHighlights.Normalize(typed));
+        Assert.Null(HexColor.Normalize(typed));
     }
 
     [Fact]
     public void A_colour_is_split_into_its_three_bytes()
     {
-        Assert.Equal(((byte)0xFF, (byte)0x9F, (byte)0x0A), ChatHighlights.Parse("#FF9F0A"));
-        Assert.Equal(((byte)0, (byte)0, (byte)0), ChatHighlights.Parse("#000000"));
-        Assert.Equal(((byte)255, (byte)255, (byte)255), ChatHighlights.Parse("#FFFFFF"));
+        Assert.Equal(((byte)0xFF, (byte)0x9F, (byte)0x0A), HexColor.Parse("#FF9F0A"));
+        Assert.Equal(((byte)0, (byte)0, (byte)0), HexColor.Parse("#000000"));
+        Assert.Equal(((byte)255, (byte)255, (byte)255), HexColor.Parse("#FFFFFF"));
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public class ChatHighlightTests
         Assert.Equal(ChatHighlights.Palette.Count, ChatHighlights.Palette.Select(s => s.Name).Distinct().Count());
         foreach (var swatch in ChatHighlights.Palette)
         {
-            Assert.Equal(swatch.Hex, ChatHighlights.Normalize(swatch.Hex));
+            Assert.Equal(swatch.Hex, HexColor.Normalize(swatch.Hex));
             Assert.False(string.IsNullOrWhiteSpace(swatch.Name));
         }
     }
@@ -101,7 +102,7 @@ public class ChatHighlightTests
     {
         foreach (var swatch in ChatHighlights.Palette)
         {
-            var (r, g, b) = ChatHighlights.Parse(swatch.Hex);
+            var (r, g, b) = HexColor.Parse(swatch.Hex);
             var (h, s, v) = ChatHighlights.ToHsv(r, g, b);
             var (r2, g2, b2) = ChatHighlights.FromHsv(h, s, v);
             Assert.Equal(swatch.Hex, ChatHighlights.ToHex(r2, g2, b2));

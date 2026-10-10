@@ -1,9 +1,6 @@
 using System;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Windows;
-using System.Windows.Media;
 using System.Windows.Threading;
 using StreamHelper.Models;
 using StreamHelper.Storage;
@@ -24,6 +21,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         new(SyncState.NotConnected, "Не подключено"),
     };
     private int _selectedTab;
+    private readonly bool[] _hidden = new bool[6];
     private string _undoText = "";
     private bool _hasUndo;
     private bool _canUndo;
@@ -69,8 +67,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MomentStore Moments { get; }
 
     public int TotalUnseen =>
-        Donations.UnseenCount + Followers.UnseenCount + Subscribers.UnseenCount + Redemptions.UnseenCount + Pings.UnseenCount +
-        Moments.UnseenCount;
+        Unseen(0, Donations) + Unseen(1, Followers) + Unseen(2, Subscribers) + Unseen(3, Redemptions) + Unseen(4, Pings) + Unseen(5, Moments);
+
+    private int Unseen<T>(int tab, EventStore<T> store) where T : class, ISeenItem => _hidden[tab] ? 0 : store.UnseenCount;
+
+    public bool IsHidden(int tab) => tab >= 0 && tab < _hidden.Length && _hidden[tab];
+
+    public bool ShowDonationsTab => !_hidden[0];
+    public bool ShowFollowersTab => !_hidden[1];
+    public bool ShowSubscribersTab => !_hidden[2];
+    public bool ShowRewardsTab => !_hidden[3];
+    public bool ShowPingsTab => !_hidden[4];
+    public bool ShowMomentsTab => !_hidden[5];
+
+    public void ApplyHiddenTabs(AppSettings settings)
+    {
+        for (var i = 0; i < _hidden.Length; i++) _hidden[i] = settings.IsTabHidden(i);
+        Raise(nameof(ShowDonationsTab));
+        Raise(nameof(ShowFollowersTab));
+        Raise(nameof(ShowSubscribersTab));
+        Raise(nameof(ShowRewardsTab));
+        Raise(nameof(ShowPingsTab));
+        Raise(nameof(ShowMomentsTab));
+        Raise(nameof(TotalUnseen));
+        SelectedTab = settings.VisibleTab(_selectedTab);
+    }
 
     public int SelectedTab
     {
@@ -151,7 +172,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string FollowersEmptyText => EmptyText(_statuses[1], "Новые фолловеры появятся здесь.");
 
-    public string SubscribersEmptyText => EmptyText(_statuses[2], "Новые подписки появятся здесь.\nСобытия приходят только пока приложение запущено.");
+    public string SubscribersEmptyText => EmptyText(_statuses[2], "Новые подписки и Bits появятся здесь.\nСобытия приходят только пока приложение запущено.");
 
     public string RewardsEmptyText => EmptyText(_statuses[3], "Новые награды за баллы появятся здесь.\nСобытия приходят только пока приложение запущено.");
 

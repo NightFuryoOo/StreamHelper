@@ -53,23 +53,62 @@ public sealed class AppSettings
 
     public Dictionary<string, HotkeyBinding> Hotkeys { get; set; } = new();
 
-    public HotkeyBinding GetHotkey(HotkeyAction action) =>
-        Hotkeys != null && Hotkeys.TryGetValue(action.ToString(), out var binding) && binding != null ? binding : new HotkeyBinding();
+    public const string RewardHotkeyPrefix = "RewardSound:";
 
-    public void SetHotkey(HotkeyAction action, uint modifiers, uint virtualKey)
+    public static string RewardHotkeyKey(string soundKey) => RewardHotkeyPrefix + soundKey;
+
+    public HotkeyBinding GetHotkey(HotkeyAction action) => GetHotkey(action.ToString());
+
+    public HotkeyBinding GetHotkey(string key) =>
+        Hotkeys != null && Hotkeys.TryGetValue(key, out var binding) && binding != null ? binding : new HotkeyBinding();
+
+    public void SetHotkey(HotkeyAction action, uint modifiers, uint virtualKey) => SetHotkey(action.ToString(), modifiers, virtualKey);
+
+    public void SetHotkey(string key, uint modifiers, uint virtualKey)
     {
         Hotkeys ??= new Dictionary<string, HotkeyBinding>();
-        if (virtualKey == 0) Hotkeys.Remove(action.ToString());
-        else Hotkeys[action.ToString()] = new HotkeyBinding { Modifiers = modifiers, VirtualKey = virtualKey };
+        if (virtualKey == 0) Hotkeys.Remove(key);
+        else Hotkeys[key] = new HotkeyBinding { Modifiers = modifiers, VirtualKey = virtualKey };
     }
 
-    public HotkeyAction? FindHotkeyOwner(uint modifiers, uint virtualKey, HotkeyAction except)
+    public IReadOnlyList<(string SoundKey, HotkeyBinding Binding)> RewardHotkeys()
     {
-        foreach (var action in HotkeyActions.All)
+        if (Hotkeys == null) return Array.Empty<(string, HotkeyBinding)>();
+        return Hotkeys
+            .Where(pair => pair.Key.StartsWith(RewardHotkeyPrefix, StringComparison.Ordinal) && pair.Value is { IsSet: true })
+            .Select(pair => (SoundKey: pair.Key[RewardHotkeyPrefix.Length..], Binding: pair.Value))
+            .Where(pair => RewardSounds != null && RewardSounds.ContainsKey(pair.SoundKey))
+            .OrderBy(pair => pair.SoundKey, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public bool MoveCopyRewardHotkeys()
+    {
+        if (Hotkeys == null || RewardSounds == null || RewardCopies == null) return false;
+        var moved = false;
+        foreach (var key in Hotkeys.Keys.Where(k => k.StartsWith(RewardHotkeyPrefix, StringComparison.Ordinal)).ToList())
         {
-            if (action == except) continue;
-            var binding = GetHotkey(action);
-            if (binding.IsSet && binding.VirtualKey == virtualKey && binding.Modifiers == modifiers) return action;
+            var id = key[RewardHotkeyPrefix.Length..];
+            if (RewardSounds.ContainsKey(id)) continue;
+            var original = RewardCopies.FirstOrDefault(pair => pair.Value == id).Key;
+            if (original == null || !RewardSounds.ContainsKey(original)) continue;
+            var binding = Hotkeys[key];
+            Hotkeys.Remove(key);
+            if (!GetHotkey(RewardHotkeyKey(original)).IsSet && binding is { IsSet: true }) Hotkeys[RewardHotkeyKey(original)] = binding;
+            moved = true;
+        }
+        return moved;
+    }
+
+    public string? FindHotkeyOwner(uint modifiers, uint virtualKey, string exceptKey)
+    {
+        var keys = HotkeyActions.All.Select(action => action.ToString())
+            .Concat(RewardHotkeys().Select(pair => RewardHotkeyKey(pair.SoundKey)));
+        foreach (var key in keys)
+        {
+            if (key == exceptKey) continue;
+            var binding = GetHotkey(key);
+            if (binding.IsSet && binding.VirtualKey == virtualKey && binding.Modifiers == modifiers) return key;
         }
         return null;
     }
@@ -131,6 +170,38 @@ public sealed class AppSettings
     public int ToastSeconds { get; set; } = 6;
     public bool NotifyFollowers { get; set; } = true;
     public bool NotifySubscribers { get; set; } = true;
+    public bool NotifyBits { get; set; } = true;
+    public List<string> HiddenTabs { get; set; } = new();
+
+    public bool IsTabHidden(int index) =>
+        index >= 0 && index < MainTabs.Keys.Length && HiddenTabs != null && HiddenTabs.Contains(MainTabs.Keys[index]) && VisibleTabCount() > 0;
+
+    public int VisibleTabCount() => MainTabs.Keys.Count(key => HiddenTabs == null || !HiddenTabs.Contains(key));
+
+    public int VisibleTab(int preferred)
+    {
+        if (preferred >= 0 && preferred < MainTabs.Keys.Length && !IsTabHidden(preferred)) return preferred;
+        for (var i = 0; i < MainTabs.Keys.Length; i++)
+        {
+            if (!IsTabHidden(i)) return i;
+        }
+        return 0;
+    }
+
+    public void SetTabHidden(int index, bool hidden)
+    {
+        if (index < 0 || index >= MainTabs.Keys.Length) return;
+        HiddenTabs ??= new List<string>();
+        var key = MainTabs.Keys[index];
+        if (!hidden)
+        {
+            HiddenTabs.RemoveAll(k => k == key);
+            return;
+        }
+        if (HiddenTabs.Contains(key) || VisibleTabCount() <= 1) return;
+        HiddenTabs.Add(key);
+    }
+
     public bool NotifyRewards { get; set; } = true;
     public bool NotifyPings { get; set; } = true;
     public bool NotifyRaids { get; set; } = true;
@@ -147,7 +218,12 @@ public sealed class AppSettings
 
     public bool ChatHidden { get; set; }
 
+    public bool ChatTypingMode { get; set; }
+
     public Dictionary<string, string> ChatHighlights { get; set; } = new();
+    public const string DefaultPingColor = "#FF9F0A";
+    public bool ChatPingHighlight { get; set; } = true;
+    public string ChatPingColor { get; set; } = DefaultPingColor;
     public double ChatOpacity { get; set; } = 0.6;
 
     public double ChatCellOpacity { get; set; } = 0.2;
@@ -312,6 +388,15 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool HasModeratedChannelsScope => HasScope("user:read:moderated_channels");
+
+    [JsonIgnore]
+    public bool HasChatWriteScope => HasScope("user:write:chat");
+
+    [JsonIgnore]
+    public bool HasDeleteMessagesScope => HasScope("moderator:manage:chat_messages");
+
+    [JsonIgnore]
+    public bool HasBitsScope => HasScope("bits:read");
 
     [JsonIgnore]
     public string RedirectUri => $"http://127.0.0.1:{RedirectPort}/callback";

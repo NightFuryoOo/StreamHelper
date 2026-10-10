@@ -47,17 +47,18 @@ public sealed class PingListener : EventSubListener<ChatPing>
             return null;
         }
         if (message.Chat is not { } chat) return null;
+        var settings = _settings.Current;
+        var ignored = (IEnumerable<string>?)settings.PingIgnoredChatters ?? AppSettings.DefaultPingIgnored;
+        var isPing = PingDetector.IsPing(chat, settings.TwitchUserId, settings.TwitchLogin, ignored, settings.PingWords);
         try
         {
-            _onChat?.Invoke(chat);
+            _onChat?.Invoke(isPing ? chat with { IsPing = true } : chat);
         }
         catch (Exception ex)
         {
             Log.Write("Chat window failed: " + ex.Message);
         }
-        var settings = _settings.Current;
-        var ignored = (IEnumerable<string>?)settings.PingIgnoredChatters ?? AppSettings.DefaultPingIgnored;
-        if (!PingDetector.IsPing(chat, settings.TwitchUserId, settings.TwitchLogin, ignored, settings.PingWords)) return null;
+        if (!isPing) return null;
 
         return new ChatPing
         {

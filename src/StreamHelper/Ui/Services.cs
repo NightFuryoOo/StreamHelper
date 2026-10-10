@@ -224,6 +224,19 @@ public sealed class Services
         HandleSubscribers(new[] { subscriber });
     }
 
+    public void AddTestBits()
+    {
+        var stamp = DateTime.UtcNow;
+        var key = "test-bits-" + stamp.Ticks;
+        var bits = Random.Shared.Next(3) switch
+        {
+            0 => new Subscriber { Key = key, Kind = SubscriptionKind.Bits, Tier = "", Login = "test_cheer", DisplayName = "Test_Cheer", Bits = 500, Message = "[тест] Держи Bits!", AtUtc = stamp },
+            1 => new Subscriber { Key = key, Kind = SubscriptionKind.Bits, Tier = "", Login = "big_fan", DisplayName = "Big_Fan", Bits = 100, PowerUp = "большой смайл Kappa", AtUtc = stamp },
+            _ => new Subscriber { Key = key, Kind = SubscriptionKind.Bits, Tier = "", IsAnonymous = true, Bits = 1000, Message = "[тест] Анонимно", AtUtc = stamp },
+        };
+        HandleSubscribers(new[] { bits });
+    }
+
     public void RestartTwitchSync()
     {
         FollowerPoller.PollSoon();
@@ -262,12 +275,15 @@ public sealed class Services
     {
         if (_settingsWindow is { IsLoaded: true })
         {
+            if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;
             _settingsWindow.Activate();
+            NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_settingsWindow).Handle);
             return;
         }
         _settingsWindow = new SettingsWindow(this);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
+        NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_settingsWindow).Handle);
     }
 }

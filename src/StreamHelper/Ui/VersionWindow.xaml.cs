@@ -59,6 +59,7 @@ public partial class VersionWindow : Window
         var row = VersionList.SelectedItem as VersionRow;
         NotesText.Text = row?.Release.Notes ?? "";
         NotesBox.Visibility = NotesText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        MoreButton.Visibility = row != null && (row.Release.Body.Length > 0 || row.Release.Notes.Length > 0) ? Visibility.Visible : Visibility.Collapsed;
         ShowInstall(row);
     }
 
@@ -83,6 +84,11 @@ public partial class VersionWindow : Window
         WarnText.Visibility = Visibility.Collapsed;
         ShowInstall(row);
         await _updates.InstallChosenAsync(row.Release, _releases);
+    }
+
+    private void OnMore(object sender, RoutedEventArgs e)
+    {
+        if (VersionList.SelectedItem is VersionRow row) ReleaseNotesWindow.ShowFor(this, _updates, row.Release, offerUpdate: false);
     }
 
     private async void OnRetry(object sender, RoutedEventArgs e) => await LoadAsync();

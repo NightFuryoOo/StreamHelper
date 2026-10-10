@@ -10,8 +10,11 @@ namespace StreamHelper.Ui;
 public sealed class HotkeyService : IDisposable
 {
     private const int BaseId = 0x4F52;
+    private const int ProbeId = 0x4FFF;
+    private const int RewardBaseId = 0x5000;
     private readonly HwndSource _source;
     private readonly HashSet<HotkeyAction> _registered = new();
+    private readonly Dictionary<int, string> _rewards = new();
 
     public HotkeyService()
     {
@@ -27,11 +30,32 @@ public sealed class HotkeyService : IDisposable
 
     public event Action<HotkeyAction>? Pressed;
 
+    public event Action<string>? RewardPressed;
+
     internal IntPtr Handle => _source.Handle;
 
     internal static int IdOf(HotkeyAction action) => BaseId + (int)action;
 
+    internal int? IdOfReward(string soundKey)
+    {
+        foreach (var pair in _rewards)
+        {
+            if (pair.Value == soundKey) return pair.Key;
+        }
+        return null;
+    }
+
     public bool IsRegistered(HotkeyAction action) => _registered.Contains(action);
+
+    public bool IsRewardRegistered(string soundKey) => _rewards.ContainsValue(soundKey);
+
+    public bool IsFree(uint modifiers, uint virtualKey)
+    {
+        if (virtualKey == 0) return false;
+        if (!NativeMethods.RegisterHotKey(_source.Handle, ProbeId, modifiers | NativeMethods.ModNoRepeat, virtualKey)) return false;
+        NativeMethods.UnregisterHotKey(_source.Handle, ProbeId);
+        return true;
+    }
 
     public bool Register(HotkeyAction action, uint modifiers, uint virtualKey)
     {
@@ -51,11 +75,18 @@ public sealed class HotkeyService : IDisposable
     public void UnregisterAll()
     {
         foreach (var action in _registered.ToArray()) Unregister(action);
+        UnregisterRewards();
     }
 
-    public IReadOnlyList<HotkeyAction> RegisterAll(AppSettings settings)
+    private void UnregisterRewards()
     {
-        var failed = new List<HotkeyAction>();
+        foreach (var id in _rewards.Keys) NativeMethods.UnregisterHotKey(_source.Handle, id);
+        _rewards.Clear();
+    }
+
+    public IReadOnlyList<string> RegisterAll(AppSettings settings)
+    {
+        var failed = new List<string>();
         foreach (var action in HotkeyActions.All)
         {
             var binding = settings.GetHotkey(action);
@@ -64,7 +95,16 @@ public sealed class HotkeyService : IDisposable
                 Unregister(action);
                 continue;
             }
-            if (!Register(action, binding.Modifiers, binding.VirtualKey)) failed.Add(action);
+            if (!Register(action, binding.Modifiers, binding.VirtualKey)) failed.Add(action.ToString());
+        }
+
+        UnregisterRewards();
+        var id = RewardBaseId;
+        foreach (var (soundKey, binding) in settings.RewardHotkeys())
+        {
+            if (NativeMethods.RegisterHotKey(_source.Handle, id, binding.Modifiers | NativeMethods.ModNoRepeat, binding.VirtualKey)) _rewards[id] = soundKey;
+            else failed.Add(AppSettings.RewardHotkeyKey(soundKey));
+            id++;
         }
         return failed;
     }
@@ -80,6 +120,12 @@ public sealed class HotkeyService : IDisposable
     {
         if (msg == NativeMethods.WmHotkey)
         {
+            if (_rewards.TryGetValue(wParam.ToInt32(), out var soundKey))
+            {
+                handled = true;
+                RewardPressed?.Invoke(soundKey);
+                return IntPtr.Zero;
+            }
             var index = wParam.ToInt32() - BaseId;
             if (index >= 0 && Enum.IsDefined(typeof(HotkeyAction), index))
             {

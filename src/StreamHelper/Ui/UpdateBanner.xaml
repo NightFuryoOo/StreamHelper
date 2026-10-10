@@ -25,12 +25,14 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                <Button Style="{StaticResource PrimaryButton}" Content="Обновить" IsEnabled="{Binding NotBusy}" Click="OnUpdate"/>
-                <Button Style="{StaticResource FlatButton}" Content="Позже" Margin="8,0,0,0" IsEnabled="{Binding NotBusy}" Click="OnLater"/>
-                <Button Style="{StaticResource FlatButton}" Content="Больше не показывать" Margin="8,0,0,0" IsEnabled="{Binding NotBusy}" Click="OnNever"
+            <WrapPanel Margin="0,8,0,0">
+                <Button Style="{StaticResource PrimaryButton}" Content="Обновить" Margin="0,0,8,0" IsEnabled="{Binding NotBusy}" Click="OnUpdate"/>
+                <Button Style="{StaticResource FlatButton}" Content="Подробнее" Margin="0,0,8,0" Click="OnMore"
+                        Visibility="{Binding HasNotes, Converter={StaticResource BoolVis}}" ToolTip="Открыть полный текст обновления в отдельном окне"/>
+                <Button Style="{StaticResource FlatButton}" Content="Позже" Margin="0,0,8,0" IsEnabled="{Binding NotBusy}" Click="OnLater"/>
+                <Button Style="{StaticResource FlatButton}" Content="Больше не показывать" IsEnabled="{Binding NotBusy}" Click="OnNever"
                         ToolTip="Не напоминать об этой версии. Баннер появится снова, когда выйдет следующая."/>
-            </StackPanel>
+            </WrapPanel>
         </StackPanel>
     </Border>
 </UserControl>

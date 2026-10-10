@@ -72,6 +72,8 @@ public sealed class UpdateService : INotifyPropertyChanged
 
     public bool HasAvailable => _release != null;
 
+    public UpdateRelease? Release => _release;
+
     public string Notes => _release?.Notes ?? "";
 
     public bool HasNotes => Notes.Length > 0;

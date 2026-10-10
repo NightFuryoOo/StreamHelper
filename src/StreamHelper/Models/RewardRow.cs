@@ -8,9 +8,7 @@ public sealed class RewardRow : INotifyPropertyChanged
     private bool _shown;
     private bool _busy;
     private bool _confirming;
-    private bool _renaming;
     private string _title;
-    private string _editText = "";
 
     public RewardRow(string id, string title, long cost, bool enabled, bool own, bool canManage, int pendingCount, bool shown)
     {
@@ -39,7 +37,7 @@ public sealed class RewardRow : INotifyPropertyChanged
             Raise(nameof(ConfirmText));
             Raise(nameof(SwitchName));
             Raise(nameof(DeleteName));
-            Raise(nameof(RenameName));
+            Raise(nameof(EditName));
         }
     }
 
@@ -63,32 +61,7 @@ public sealed class RewardRow : INotifyPropertyChanged
 
     public string DeleteName => $"Удалить «{Name}»";
 
-    public string RenameName => $"Переименовать «{Name}»";
-
-    public bool Renaming
-    {
-        get => _renaming;
-        set
-        {
-            if (_renaming == value) return;
-            _renaming = value;
-            Raise(nameof(Renaming));
-            Raise(nameof(NotRenaming));
-        }
-    }
-
-    public bool NotRenaming => !_renaming;
-
-    public string EditText
-    {
-        get => _editText;
-        set
-        {
-            if (_editText == value) return;
-            _editText = value;
-            Raise(nameof(EditText));
-        }
-    }
+    public string EditName => $"Изменить «{Name}»";
 
     public bool Enabled
     {

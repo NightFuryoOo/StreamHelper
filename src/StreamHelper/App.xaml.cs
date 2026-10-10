@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -40,6 +39,7 @@ public partial class App : Application
         AppPaths.Init(ReadOption(args, "--data"));
         if (!BecomeTheOnlyInstance(Array.IndexOf(args, RestartFlag) >= 0))
         {
+            NativeMethods.AllowSetForegroundWindow(NativeMethods.AnyProcess);
             _showSignal!.Set();
             Shutdown();
             return;
@@ -66,6 +66,17 @@ public partial class App : Application
         CreateTray(services);
 
         services.Hotkey.Pressed += action => Dispatcher.InvokeAsync(() => OnHotkey(services, action));
+        services.Hotkey.RewardPressed += rewardId => Dispatcher.InvokeAsync(() => services.RewardAlert.PlayByHotkey(rewardId));
+        services.Chat.TypingChanged += typing =>
+        {
+            if (typing)
+            {
+                services.Hotkey.UnregisterAll();
+                return;
+            }
+            foreach (var failed in services.Hotkey.RegisterAll(services.Settings.Current)) Log.Write($"Hotkey registration failed for {failed} after typing.");
+        };
+        if (settings.Current.MoveCopyRewardHotkeys()) settings.Save();
         foreach (var failed in services.Hotkey.RegisterAll(settings.Current))
         {
             Log.Write($"Hotkey registration failed for {failed}: combination is taken by another program.");
@@ -77,7 +88,7 @@ public partial class App : Application
             while (true)
             {
                 showSignal.WaitOne();
-                Dispatcher.InvokeAsync(services.Overlay.ShowOverlay);
+                Dispatcher.InvokeAsync(services.OpenSettings);
             }
         });
 
@@ -97,15 +108,8 @@ public partial class App : Application
         services.Updates.Start();
 
         if (showAtStart) services.Overlay.ShowOverlay();
-        if (imported != null)
-        {
-            services.ProfileNotice = ProfileTexts.Imported(imported, settings.Current);
-            services.OpenSettings();
-        }
-        else if (!settings.Current.HasAnyDonationSource)
-        {
-            services.OpenSettings();
-        }
+        if (imported != null) services.ProfileNotice = ProfileTexts.Imported(imported, settings.Current);
+        services.OpenSettings();
     }
 
     private bool BecomeTheOnlyInstance(bool restarted)
@@ -148,6 +152,7 @@ public partial class App : Application
             settings.Current.SelectedTab = viewModel.SelectedTab;
             settings.Save();
         };
+        viewModel.ApplyHiddenTabs(settings.Current);
         var chatFeed = new ChatFeed();
         var sevenTv = new SevenTvCatalog(new SevenTvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_7TV_URL")), () => settings.Current.ChannelId);
         var emotes = new ChatEmotes(sevenTv, new EmoteImageCache(_http), twitchEndpoints);
@@ -167,7 +172,7 @@ public partial class App : Application
             Hotkey = new HotkeyService(),
             Toasts = new ToastService(settings),
             ChatFeed = chatFeed,
-            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes),
+            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch),
             Votes = votes,
             RewardAlert = new RewardAlertService(settings),
             RewardMute = new RewardMuteSwitch(settings, twitch),
@@ -287,11 +292,15 @@ public partial class App : Application
     private static void OnHotkey(Services services, HotkeyAction action)
     {
         var tab = HotkeyActions.TabIndex(action);
-        if (tab >= 0) services.Overlay.ToggleTab(tab);
+        if (tab >= 0)
+        {
+            if (!services.ViewModel.IsHidden(tab)) services.Overlay.ToggleTab(tab);
+        }
         else if (action == HotkeyAction.Settings) services.ToggleSettings();
         else if (action == HotkeyAction.HideToasts) services.Toasts.HideNow();
         else if (action == HotkeyAction.ChatInteract) services.Chat.ToggleInteractive();
         else if (action == HotkeyAction.ChatToggle) services.Chat.ToggleVisible();
+        else if (action == HotkeyAction.ChatWrite) services.Chat.BeginTyping();
         else if (action == HotkeyAction.RewardSoundsMute) services.RewardAlert.ToggleMuted();
     }
 
@@ -351,7 +360,7 @@ public partial class App : Application
         Deliver(s => s.Followers, items, s => s.NotifyFollowers, EventToasts.Followers);
 
     private void OnSubscribers(IReadOnlyList<Subscriber> items) =>
-        Deliver(s => s.Subscribers, items, s => s.NotifySubscribers, EventToasts.Subscribers);
+        Deliver(s => s.Subscribers, items, EventToasts.Notifies, EventToasts.Subscribers);
 
     private void OnPings(IReadOnlyList<ChatPing> items) =>
         Deliver(s => s.Pings, items, s => s.NotifyPings, EventToasts.Pings);

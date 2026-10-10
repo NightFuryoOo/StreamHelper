@@ -21,6 +21,11 @@ public partial class UpdateBanner : UserControl
         if (DataContext is UpdateService updates) await updates.UpdateAsync();
     }
 
+    private void OnMore(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is UpdateService updates) ReleaseNotesWindow.ShowFor(Window.GetWindow(this), updates);
+    }
+
     private void OnLater(object sender, RoutedEventArgs e)
     {
         if (DataContext is UpdateService updates) updates.Later();

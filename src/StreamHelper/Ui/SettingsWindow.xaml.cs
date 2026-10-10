@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
         InitMuteBadge(settings);
         ShowCredits(!settings.CreditsCollapsed);
         InitNotifyChecks(settings);
+        InitTabChecks(settings);
         InitPings(settings);
         InitMuteRewards();
         InitRewardSounds();
@@ -183,6 +184,7 @@ public partial class SettingsWindow : Window
         ToastCheck.IsChecked = settings.ShowToast;
         FollowersCheck.IsChecked = settings.NotifyFollowers;
         SubscribersCheck.IsChecked = settings.NotifySubscribers;
+        BitsCheck.IsChecked = settings.NotifyBits;
         RewardsCheck.IsChecked = settings.NotifyRewards;
         PingsCheck.IsChecked = settings.NotifyPings;
         RaidsCheck.IsChecked = settings.NotifyRaids;
@@ -196,6 +198,7 @@ public partial class SettingsWindow : Window
         settings.ShowToast = ToastCheck.IsChecked == true;
         settings.NotifyFollowers = FollowersCheck.IsChecked == true;
         settings.NotifySubscribers = SubscribersCheck.IsChecked == true;
+        settings.NotifyBits = BitsCheck.IsChecked == true;
         settings.NotifyRewards = RewardsCheck.IsChecked == true;
         settings.NotifyPings = PingsCheck.IsChecked == true;
         settings.NotifyRaids = RaidsCheck.IsChecked == true;
@@ -208,6 +211,8 @@ public partial class SettingsWindow : Window
     private void OnAddTestFollower(object sender, RoutedEventArgs e) => _services.AddTestFollower();
 
     private void OnAddTestSubscriber(object sender, RoutedEventArgs e) => _services.AddTestSubscriber();
+
+    private void OnAddTestBits(object sender, RoutedEventArgs e) => _services.AddTestBits();
 
     private void OnAddTestRedemption(object sender, RoutedEventArgs e) => _services.AddTestRedemption();
 

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using StreamHelper.Models;
 
 namespace StreamHelper.Ui;
 
@@ -19,19 +19,6 @@ public static class ChatHighlights
         new Swatch("Голубой", "#64D2FF"),
         new Swatch("Зелёный", "#30D158"),
     };
-
-    public static string? Normalize(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var digits = text.Trim().TrimStart('#');
-        if (digits.Length == 3) digits = string.Concat(digits[0], digits[0], digits[1], digits[1], digits[2], digits[2]);
-        if (digits.Length != 6) return null;
-        foreach (var c in digits)
-        {
-            if (!Uri.IsHexDigit(c)) return null;
-        }
-        return "#" + digits.ToUpperInvariant();
-    }
 
     public static (byte R, byte G, byte B) FromHsv(double h, double s, double v)
     {
@@ -69,8 +56,9 @@ public static class ChatHighlights
 
     public static string ToHex(byte r, byte g, byte b) => $"#{r:X2}{g:X2}{b:X2}";
 
-    public static (byte R, byte G, byte B) Parse(string normalized) =>
-        (byte.Parse(normalized.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
-         byte.Parse(normalized.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
-         byte.Parse(normalized.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+    public const double PingLineOpacity = 0.55;
+
+    public static string PingColor(Storage.AppSettings settings) => HexColor.Normalize(settings.ChatPingColor) ?? Storage.AppSettings.DefaultPingColor;
+
+    public static bool MarksPing(Storage.AppSettings settings, Api.ChatMessage message) => message.IsPing && settings.ChatPingHighlight;
 }

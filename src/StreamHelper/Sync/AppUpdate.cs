@@ -10,7 +10,8 @@ namespace StreamHelper.Sync;
 public sealed record UpdateAsset(string Name, string Url, long Size, string? Digest = null);
 
 public sealed record UpdateRelease(
-    Version Version, string Tag, string Name, string Notes, string PageUrl, UpdateAsset? Exe, UpdateAsset? Checksum, DateTime? PublishedUtc = null)
+    Version Version, string Tag, string Name, string Notes, string PageUrl, UpdateAsset? Exe, UpdateAsset? Checksum, DateTime? PublishedUtc = null,
+    string Body = "")
 {
     public bool CanInstall => Exe != null && (Exe.Digest != null || Checksum != null);
 }
@@ -24,6 +25,7 @@ public static class AppUpdate
     public const string ChecksumAsset = "StreamHelper.exe.sha256";
     public const long MaxExeBytes = 300L * 1024 * 1024;
     public const int MaxNotesLength = 1500;
+    public const int MaxBodyLength = 20000;
 
     public static readonly Version OldestChoosable = new(1, 0, 0, 1);
 
@@ -100,7 +102,7 @@ public static class AppUpdate
             System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at : null;
         return new UpdateRelease(
             version, tag, Text(root, "name"), CleanNotes(Text(root, "body")), Text(root, "html_url"),
-            Find(assets, ExeAsset), Find(assets, ChecksumAsset), published);
+            Find(assets, ExeAsset), Find(assets, ChecksumAsset), published, FullNotes(Text(root, "body")));
     }
 
     public static string? ParseDigest(string digest)
@@ -115,6 +117,12 @@ public static class AppUpdate
     {
         var match = Regex.Match(text ?? "", @"(?<![0-9A-Fa-f])[0-9A-Fa-f]{64}(?![0-9A-Fa-f])");
         return match.Success ? match.Value.ToUpperInvariant() : null;
+    }
+
+    public static string FullNotes(string body)
+    {
+        var text = (body ?? "").Replace("\r", "").Trim();
+        return text.Length <= MaxBodyLength ? text : text[..MaxBodyLength].TrimEnd() + "…";
     }
 
     public static string CleanNotes(string body)

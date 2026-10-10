@@ -147,19 +147,8 @@ public class RewardRenameTests
 
         Assert.Equal("Новое", row.Name);
         Assert.Equal("Новое · 100 баллов", row.DisplayText);
-        Assert.Equal("Переименовать «Новое»", row.RenameName);
-        foreach (var name in new[] { "Title", "Name", "DisplayText", "ConfirmText", "SwitchName", "DeleteName", "RenameName" }) Assert.Contains(name, raised);
-    }
-
-    [Fact]
-    public void Renaming_switches_between_the_text_and_the_box()
-    {
-        var row = new RewardRow("copy-1", "Alpha", 100, true, true, true, 0, true);
-
-        row.Renaming = true;
-
-        Assert.True(row.Renaming);
-        Assert.False(row.NotRenaming);
+        Assert.Equal("Изменить «Новое»", row.EditName);
+        foreach (var name in new[] { "Title", "Name", "DisplayText", "ConfirmText", "SwitchName", "DeleteName", "EditName" }) Assert.Contains(name, raised);
     }
 }
 

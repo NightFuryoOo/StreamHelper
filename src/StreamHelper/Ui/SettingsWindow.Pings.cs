@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Input;
+using System.Windows.Media;
 using StreamHelper.Models;
 using StreamHelper.Storage;
 using StreamHelper.Sync;
@@ -21,6 +23,47 @@ public partial class SettingsWindow
         PingIgnoredList.ItemsSource = _pingIgnored;
         foreach (var word in settings.PingWords) _pingWords.Add(new RemovableEntry(word));
         PingWordsList.ItemsSource = _pingWords;
+        PingHighlightCheck.IsChecked = settings.ChatPingHighlight;
+        foreach (var swatch in ChatHighlights.Palette)
+        {
+            PingSwatches.Children.Add(ColorSwatch.Create(this, swatch.Hex, swatch.Name, "Цвет пингов: " + swatch.Name, () => SetPingColor(swatch.Hex)));
+        }
+        RefreshPingColor();
+    }
+
+    private void SetPingColor(string hex)
+    {
+        _services.Settings.Current.ChatPingColor = HexColor.Normalize(hex) ?? AppSettings.DefaultPingColor;
+        _services.Settings.Save();
+        RefreshPingColor();
+        _services.Chat.Apply();
+    }
+
+    private void RefreshPingColor()
+    {
+        var settings = _services.Settings.Current;
+        var hex = ChatHighlights.PingColor(settings);
+        var (r, g, b) = HexColor.Parse(hex);
+        PingColorPreview.Background = new SolidColorBrush(Color.FromRgb(r, g, b));
+        PingColorPreview.ToolTip = hex;
+        AutomationProperties.SetHelpText(PingColorPreview, hex);
+        PingColorRow.IsEnabled = settings.ChatPingHighlight;
+        PingColorRow.Opacity = settings.ChatPingHighlight ? 1 : 0.45;
+    }
+
+    private void OnPingHighlightChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ChatPingHighlight = PingHighlightCheck.IsChecked == true;
+        _services.Settings.Save();
+        RefreshPingColor();
+        _services.Chat.Apply();
+    }
+
+    private void OnPingColorCustom(object sender, RoutedEventArgs e)
+    {
+        var hex = HighlightColorDialog.Ask(this, "Пинг", (Brush)FindResource("TextBrush"), ChatHighlights.PingColor(_services.Settings.Current));
+        if (hex != null) SetPingColor(hex);
     }
 
     private static bool Contains(IEnumerable<string> list, string value) =>

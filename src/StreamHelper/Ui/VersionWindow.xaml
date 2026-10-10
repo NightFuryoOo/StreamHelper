@@ -93,6 +93,8 @@
             <StackPanel IsEnabled="{Binding NotBusy}">
                 <Button x:Name="InstallButton" Style="{StaticResource PrimaryButton}" Content="Установить" IsEnabled="False" Click="OnInstall"/>
             </StackPanel>
+            <Button x:Name="MoreButton" Style="{StaticResource FlatButton}" Content="Подробнее" Margin="8,0,0,0" Visibility="Collapsed"
+                    ToolTip="Открыть полный текст этой версии в отдельном окне" Click="OnMore"/>
             <Button Style="{StaticResource FlatButton}" Content="Закрыть" Margin="8,0,0,0" Click="OnClose"/>
         </StackPanel>
     </Grid>

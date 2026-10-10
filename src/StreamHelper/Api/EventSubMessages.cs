@@ -27,13 +27,14 @@ public sealed record ChatFragment(string Type, string Text, string EmoteId = "",
 public sealed record ChatMessage(
     string MessageId, string ChatterId, string ChatterLogin, string ChatterName, string Text,
     IReadOnlyList<ChatMention> Mentions, DateTime AtUtc, string Color = "", IReadOnlyList<ChatBadge>? Badges = null,
-    IReadOnlyList<ChatFragment>? Fragments = null);
+    IReadOnlyList<ChatFragment>? Fragments = null, bool IsPing = false);
 
 public static class EventSubParser
 {
     public const string RedemptionType = "channel.channel_points_custom_reward_redemption.add";
     public const string ChatMessageType = "channel.chat.message";
     public const string ChatNoticeType = "channel.chat.notification";
+    public const string BitsUseType = "channel.bits.use";
 
     public static EventSubMessage? Parse(string json)
     {
@@ -230,9 +231,55 @@ public static class EventSubParser
                 subscriber.IsAnonymous = ReadBool(ev, "is_anonymous");
                 return subscriber;
 
+            case BitsUseType:
+                subscriber.Kind = SubscriptionKind.Bits;
+                subscriber.Tier = "";
+                subscriber.Bits = ReadInt(ev, "bits");
+                subscriber.IsAnonymous = ReadBool(ev, "is_anonymous") || (subscriber.Login.Length == 0 && subscriber.DisplayName.Length == 0);
+                subscriber.PowerUp = DescribePowerUp(ev);
+                subscriber.Message = BitsMessage(ev);
+                return subscriber.Bits > 0 ? subscriber : null;
+
             default:
                 return null;
         }
+    }
+
+    private static string DescribePowerUp(JsonElement ev)
+    {
+        switch (ReadString(ev, "type"))
+        {
+            case "power_up" when ev.TryGetProperty("power_up", out var power) && power.ValueKind == JsonValueKind.Object:
+                var emote = power.TryGetProperty("emote", out var e) && e.ValueKind == JsonValueKind.Object ? ReadString(e, "name") : "";
+                return ReadString(power, "type") switch
+                {
+                    "gigantify_an_emote" => emote.Length > 0 ? $"большой смайл {emote}" : "большой смайл",
+                    "message_effect" => "эффект сообщения",
+                    "celebration" => emote.Length > 0 ? $"празднование {emote}" : "празднование",
+                    _ => "Power-up",
+                };
+            case "power_up":
+                return "Power-up";
+            case "custom_power_up":
+                var title = ev.TryGetProperty("custom_power_up", out var custom) && custom.ValueKind == JsonValueKind.Object ? ReadString(custom, "title") : "";
+                return title.Length > 0 ? $"«{title}»" : "свой Power-up";
+            default:
+                return "";
+        }
+    }
+
+    private static string BitsMessage(JsonElement ev)
+    {
+        if (!ev.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.Object) return "";
+        var text = ReadString(message, "text");
+        if (!message.TryGetProperty("fragments", out var fragments) || fragments.ValueKind != JsonValueKind.Array || fragments.GetArrayLength() == 0) return text.Trim();
+        var builder = new System.Text.StringBuilder();
+        foreach (var fragment in fragments.EnumerateArray())
+        {
+            if (fragment.ValueKind != JsonValueKind.Object || ReadString(fragment, "type") == "cheermote") continue;
+            builder.Append(ReadString(fragment, "text"));
+        }
+        return System.Text.RegularExpressions.Regex.Replace(builder.ToString(), @"\s{2,}", " ").Trim();
     }
 
     private static string ReadString(JsonElement element, string name) =>

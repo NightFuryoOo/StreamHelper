@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using StreamHelper.Api;
@@ -213,6 +212,12 @@ public partial class ChatOverlayWindow
         var label = Item(ChatRules.ChannelHeader(settings), false);
         label.FontSize = 11;
         menu.Items.Add(label);
+        var typing = Item("Режим набора");
+        typing.IsCheckable = true;
+        typing.IsChecked = settings.ChatTypingMode;
+        typing.Checked += (_, _) => SetTypingMode(true);
+        typing.Unchecked += (_, _) => SetTypingMode(false);
+        menu.Items.Add(typing);
         if (!settings.IsOwnChannel)
         {
             menu.Items.Add(Item("Опрос… (только на своём канале)", false));

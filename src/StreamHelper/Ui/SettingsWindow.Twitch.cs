@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using StreamHelper.Storage;
-using StreamHelper.Sync;
 
 namespace StreamHelper.Ui;
 
@@ -18,10 +18,12 @@ public partial class SettingsWindow
     private void RefreshTwitchSummary()
     {
         var settings = _services.Settings.Current;
-        var chatRights = !settings.HasModerationScope && !settings.HasShoutoutScope ? "бана, мута и отметок"
-            : !settings.HasModerationScope ? "бана и мута"
-            : !settings.HasShoutoutScope ? "отметок"
-            : "";
+        var chatMissing = new List<string>();
+        if (!settings.HasModerationScope) chatMissing.Add("бана и мута");
+        if (!settings.HasDeleteMessagesScope) chatMissing.Add("удаления сообщений");
+        if (!settings.HasShoutoutScope) chatMissing.Add("отметок");
+        if (!settings.HasChatWriteScope) chatMissing.Add("сообщений в чат");
+        var chatRights = chatMissing.Count <= 1 ? string.Join("", chatMissing) : string.Join(", ", chatMissing.Take(chatMissing.Count - 1)) + " и " + chatMissing[^1];
         ChatModerationText.Text = $"Для {chatRights} переподключи Twitch (вкладка «Twitch»): нужно новое право.";
         ChatModerationText.Visibility = chatRights.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (!settings.HasTwitchTokens)
@@ -44,6 +46,9 @@ public partial class SettingsWindow
         if (!settings.HasPredictionScope) missing.Add("предикты");
         if (!settings.HasShoutoutScope) missing.Add("отметки");
         if (!settings.HasModeratedChannelsScope) missing.Add("каналы, где ты модератор");
+        if (!settings.HasChatWriteScope) missing.Add("сообщения в чат");
+        if (!settings.HasDeleteMessagesScope) missing.Add("удаление сообщений");
+        if (!settings.HasBitsScope) missing.Add("Bits");
         RefreshChannelBlock();
         if (missing.Count == 0)
         {

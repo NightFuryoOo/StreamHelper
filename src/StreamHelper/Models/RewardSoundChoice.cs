@@ -5,6 +5,7 @@ namespace StreamHelper.Models;
 public sealed class RewardSoundChoice : INotifyPropertyChanged
 {
     private string _soundName;
+    private string _hotkeyText = "";
     private bool _picked;
 
     public RewardSoundChoice(string id, string title, string soundName)
@@ -32,6 +33,17 @@ public sealed class RewardSoundChoice : INotifyPropertyChanged
     }
 
     public string SoundText => _soundName.Length == 0 ? "" : "♪ " + _soundName;
+
+    public string HotkeyText
+    {
+        get => _hotkeyText;
+        set
+        {
+            if (_hotkeyText == value) return;
+            _hotkeyText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HotkeyText)));
+        }
+    }
 
     public bool Picked
     {

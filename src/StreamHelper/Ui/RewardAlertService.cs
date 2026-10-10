@@ -60,6 +60,15 @@ public sealed class RewardAlertService
     }
 
     public bool PlayOrdered(string rewardId) => !Muted && Play(rewardId);
+
+    public string KeyOf(string rewardId) => Key(rewardId);
+
+    public void PlayByHotkey(string rewardId)
+    {
+        Log.Write("Reward alert by hotkey.");
+        if (!Play(rewardId)) Log.Write("Reward alert hotkey: the reward has no sound file.");
+    }
+
     public static string SoundKey(IReadOnlyDictionary<string, string> copies, string rewardId)
     {
         foreach (var pair in copies)
@@ -155,7 +164,11 @@ public sealed class RewardAlertService
         foreach (var id in rewardIds.Distinct(StringComparer.Ordinal))
         {
             StopOne(id);
-            changed |= _settings.Current.RewardSounds.Remove(id);
+            if (_settings.Current.RewardSounds.Remove(id))
+            {
+                changed = true;
+                _settings.Current.SetHotkey(AppSettings.RewardHotkeyKey(id), 0, 0);
+            }
             DeleteFiles(StoredBaseName(id));
         }
         if (changed) _settings.Save();

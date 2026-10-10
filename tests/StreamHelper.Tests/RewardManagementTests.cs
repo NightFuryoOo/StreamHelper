@@ -71,6 +71,15 @@ internal sealed class FakeRewardApi : IRewardApi
         return Task.FromResult(result);
     }
 
+    public List<(string RewardId, RewardInfo Values)> Updated { get; } = new();
+    public Func<string, RewardToggleResult>? OnUpdateReward { get; set; }
+
+    public Task<RewardToggleResult> UpdateRewardAsync(string rewardId, RewardInfo values, CancellationToken ct)
+    {
+        Updated.Add((rewardId, values));
+        return Task.FromResult(OnUpdateReward?.Invoke(rewardId) ?? new RewardToggleResult(true, ""));
+    }
+
     public List<(string RewardId, string Title)> Renamed { get; } = new();
     public Func<string, string, RewardRenameResult>? OnRename { get; set; }
 
