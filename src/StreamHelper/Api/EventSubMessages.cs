@@ -15,7 +15,8 @@ public sealed record EventSubMessage(
     string SubscriptionType,
     Subscriber? Subscriber,
     Redemption? Redemption,
-    ChatMessage? Chat = null);
+    ChatMessage? Chat = null,
+    ChannelMoment? Moment = null);
 
 public sealed record ChatMention(string UserId, string Login, string Name);
 
@@ -32,6 +33,7 @@ public static class EventSubParser
 {
     public const string RedemptionType = "channel.channel_points_custom_reward_redemption.add";
     public const string ChatMessageType = "channel.chat.message";
+    public const string ChatNoticeType = "channel.chat.notification";
 
     public static EventSubMessage? Parse(string json)
     {
@@ -62,15 +64,17 @@ public static class EventSubParser
             Subscriber? subscriber = null;
             Redemption? redemption = null;
             ChatMessage? chat = null;
+            ChannelMoment? moment = null;
             if (type == "notification" && payload.ValueKind == JsonValueKind.Object &&
                 payload.TryGetProperty("event", out var ev) && ev.ValueKind == JsonValueKind.Object)
             {
                 if (subscriptionType == RedemptionType) redemption = BuildRedemption(messageId, timestamp, ev);
                 else if (subscriptionType == ChatMessageType) chat = BuildChat(messageId, timestamp, ev);
+                else if (subscriptionType == ChatNoticeType) moment = BuildMoment(messageId, timestamp, ev);
                 else subscriber = BuildSubscriber(subscriptionType, messageId, timestamp, ev);
             }
 
-            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat);
+            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
@@ -130,6 +134,40 @@ public static class EventSubParser
             chatMessageId.Length > 0 ? chatMessageId : messageId,
             ReadString(ev, "chatter_user_id"), ReadString(ev, "chatter_user_login"), ReadString(ev, "chatter_user_name"),
             text, mentions, messageAt, ReadString(ev, "color"), badges, parts.Count > 0 ? parts : null);
+    }
+
+    private static ChannelMoment? BuildMoment(string messageId, DateTime at, JsonElement ev)
+    {
+        var id = ReadString(ev, "message_id");
+        var key = id.Length > 0 ? id : messageId;
+        switch (ReadString(ev, "notice_type"))
+        {
+            case "raid" when ev.TryGetProperty("raid", out var raid) && raid.ValueKind == JsonValueKind.Object:
+                return new ChannelMoment
+                {
+                    Key = key,
+                    Kind = MomentKind.Raid,
+                    Login = ReadString(raid, "user_login"),
+                    DisplayName = ReadString(raid, "user_name"),
+                    Viewers = ReadInt(raid, "viewer_count"),
+                    AtUtc = at,
+                };
+            case "watch_streak" when ev.TryGetProperty("watch_streak", out var streak) && streak.ValueKind == JsonValueKind.Object:
+                var text = ev.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.Object ? ReadString(message, "text") : "";
+                return new ChannelMoment
+                {
+                    Key = key,
+                    Kind = MomentKind.Streak,
+                    Login = ReadString(ev, "chatter_user_login"),
+                    DisplayName = ReadString(ev, "chatter_user_name"),
+                    StreakCount = ReadInt(streak, "streak_count"),
+                    ChannelPoints = ReadInt(streak, "channel_points_awarded"),
+                    Message = text,
+                    AtUtc = at,
+                };
+            default:
+                return null;
+        }
     }
 
     private static Redemption BuildRedemption(string messageId, DateTime messageAt, JsonElement ev)

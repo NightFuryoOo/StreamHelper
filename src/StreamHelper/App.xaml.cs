@@ -84,12 +84,15 @@ public partial class App : Application
         foreach (var worker in services.Workers) worker.Start();
         services.Chat.Apply();
         services.RewardAlert.MutedChanged += _ => services.MuteBadge.Apply(services.RewardAlert.Muted);
+        services.RewardAlert.MutedChanged += muted => _ = services.RewardMute.SyncAsync();
+        _ = services.RewardMute.SyncAsync();
         services.MuteBadge.Apply(services.RewardAlert.Muted);
         _ = services.RefreshManagedRewardsAsync();
         if (_exePath != null) _ = UpdateInstaller.CleanUpSoonAsync(_exePath);
-        if (UpdateInstaller.TakeMarker(AppPaths.Directory) == AppVersion.Current)
+        if (UpdateInstaller.TakeMarker(AppPaths.Directory) is { } marker && marker.Version == AppVersion.Current)
         {
-            services.Toasts.Show("StreamHelper обновлён", "Версия " + AppVersion.Current, null);
+            if (marker.Chosen) services.Toasts.Show("Установлена версия " + AppVersion.Current, "Выбрана в настройках", null);
+            else services.Toasts.Show("StreamHelper обновлён", "Версия " + AppVersion.Current, null);
         }
         services.Updates.Start();
 
@@ -131,13 +134,14 @@ public partial class App : Application
         var subscribers = new SubscriberStore(AppPaths.SubscribersFile);
         var redemptions = new RedemptionStore(AppPaths.RedemptionsFile);
         var pings = new PingStore(AppPaths.PingsFile);
-        if (demo) SeedDemo(donations, followers, subscribers, redemptions, pings);
+        var moments = new MomentStore(AppPaths.MomentsFile);
+        if (demo) SeedDemo(donations, followers, subscribers, redemptions, pings, moments);
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("StreamHelper/" + AppVersion.Current);
         var twitchEndpoints = TwitchEndpointsFromEnvironment();
         var twitch = new TwitchClient(settings, _http, twitchEndpoints);
-        var viewModel = new MainViewModel(donations, followers, subscribers, redemptions, pings, settings.Current.SelectedTab);
+        var viewModel = new MainViewModel(donations, followers, subscribers, redemptions, pings, moments, settings.Current.SelectedTab);
         viewModel.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName != nameof(MainViewModel.SelectedTab)) return;
@@ -145,8 +149,9 @@ public partial class App : Application
             settings.Save();
         };
         var chatFeed = new ChatFeed();
-        var sevenTv = new SevenTvCatalog(new SevenTvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_7TV_URL")), () => settings.Current.TwitchUserId);
+        var sevenTv = new SevenTvCatalog(new SevenTvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_7TV_URL")), () => settings.Current.ChannelId);
         var emotes = new ChatEmotes(sevenTv, new EmoteImageCache(_http), twitchEndpoints);
+        var votes = new VoteWatcher(settings, twitch);
 
         var services = new Services
         {
@@ -156,17 +161,20 @@ public partial class App : Application
             Subscribers = subscribers,
             Redemptions = redemptions,
             Pings = pings,
+            Moments = moments,
             Client = new DonationAlertsClient(settings, _http, EndpointsFromEnvironment()),
             Twitch = twitch,
             Hotkey = new HotkeyService(),
             Toasts = new ToastService(settings),
             ChatFeed = chatFeed,
-            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes),
+            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes),
+            Votes = votes,
             RewardAlert = new RewardAlertService(settings),
+            RewardMute = new RewardMuteSwitch(settings, twitch),
             MuteBadge = new MuteBadgeService(settings),
             ViewModel = viewModel,
             Updates = new UpdateService(
-                _http, Environment.GetEnvironmentVariable("STREAMHELPER_GITHUB_API"), AppVersion.Value, _exePath,
+                settings, _http, Environment.GetEnvironmentVariable("STREAMHELPER_GITHUB_API"), AppVersion.Value, _exePath,
                 UpdateInstaller.IsInstallable(_exePath, AppContext.BaseDirectory, "StreamHelper"), AppPaths.Directory, Restart),
         };
         services.Overlay = new MainWindow(services);
@@ -175,6 +183,7 @@ public partial class App : Application
         services.HandleSubscribers = OnSubscribers;
         services.HandleRedemptions = OnRedemptions;
         services.HandlePings = OnPings;
+        services.HandleMoments = OnMoments;
         services.RestartApp = Restart;
         return services;
     }
@@ -205,8 +214,11 @@ public partial class App : Application
             settings, twitch, eventSubUrl,
             OnUi<Redemption>(items => OnRedemptions(items.Where(r => settings.Current.AllowsReward(r.RewardId)).ToList())));
         Track(services.RewardListener, viewModel.ApplyRewardStatus);
-        services.PingListener = new PingListener(settings, twitch, eventSubUrl, OnUi<ChatPing>(OnPings), services.ChatFeed.Push);
+        services.PingListener = new PingListener(
+            settings, twitch, eventSubUrl, OnUi<ChatPing>(OnPings), services.ChatFeed.Push,
+            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })));
         Track(services.PingListener, viewModel.ApplyPingStatus);
+        Track(services.PingListener, viewModel.ApplyMomentStatus);
     }
 
     private void CreateTray(Services services)
@@ -310,6 +322,12 @@ public partial class App : Application
     private void Deliver<T>(
         Func<Services, EventStore<T>> store, IEnumerable<T> items, Func<AppSettings, bool> notify,
         Func<IReadOnlyList<T>, ToastText> toast, Action<IReadOnlyList<T>>? onAdded = null)
+        where T : class, ISeenItem =>
+        Deliver(store, items, (settings, _) => notify(settings), toast, onAdded);
+
+    private void Deliver<T>(
+        Func<Services, EventStore<T>> store, IEnumerable<T> items, Func<AppSettings, T, bool> notify,
+        Func<IReadOnlyList<T>, ToastText> toast, Action<IReadOnlyList<T>>? onAdded = null)
         where T : class, ISeenItem
     {
         var services = _services;
@@ -320,8 +338,9 @@ public partial class App : Application
         onAdded?.Invoke(added);
 
         var settings = services.Settings.Current;
-        if (!notify(settings) || !settings.ShowToast || services.Overlay.IsOpen) return;
-        var text = toast(added);
+        var shown = added.Where(item => notify(settings, item)).ToList();
+        if (shown.Count == 0 || !settings.ShowToast || services.Overlay.IsOpen) return;
+        var text = toast(shown);
         services.Toasts.Show(text.Title, text.Line, text.Message);
     }
 
@@ -336,6 +355,9 @@ public partial class App : Application
 
     private void OnPings(IReadOnlyList<ChatPing> items) =>
         Deliver(s => s.Pings, items, s => s.NotifyPings, EventToasts.Pings);
+
+    private void OnMoments(IReadOnlyList<ChannelMoment> items) =>
+        Deliver(s => s.Moments, items, EventToasts.Notifies, EventToasts.Moments);
 
     private void OnRedemptions(IReadOnlyList<Redemption> items)
     {
@@ -375,9 +397,18 @@ public partial class App : Application
     }
 
     private static void SeedDemo(
-        DonationStore store, FollowerStore followers, SubscriberStore subscribers, RedemptionStore redemptions, PingStore pings)
+        DonationStore store, FollowerStore followers, SubscriberStore subscribers, RedemptionStore redemptions, PingStore pings,
+        MomentStore moments)
     {
         var now = DateTime.UtcNow;
+        if (moments.Items.Count == 0)
+        {
+            moments.AddRange(new[]
+            {
+                new ChannelMoment { Key = "mo-1", Kind = MomentKind.Streak, Login = "anna_k", DisplayName = "Anna_K", StreakCount = 5, ChannelPoints = 450, Message = "Пятый стрим подряд!", AtUtc = now.AddMinutes(-20), Seen = true },
+                new ChannelMoment { Key = "mo-2", Kind = MomentKind.Raid, Login = "big_streamer", DisplayName = "Big_Streamer", Viewers = 128, AtUtc = now.AddMinutes(-4) },
+            });
+        }
         if (pings.Items.Count == 0)
         {
             pings.AddRange(new[]

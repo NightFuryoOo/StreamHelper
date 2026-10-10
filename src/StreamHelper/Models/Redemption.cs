@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Collections.Generic;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -17,6 +19,9 @@ public enum RedemptionStatus
 
 public sealed class Redemption : ISeenItem, ISelectable
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+
     private static readonly NumberFormatInfo Spaced = new() { NumberGroupSeparator = " ", NumberDecimalDigits = 0 };
 
     private bool _seen;

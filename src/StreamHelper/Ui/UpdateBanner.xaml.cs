@@ -25,4 +25,9 @@ public partial class UpdateBanner : UserControl
     {
         if (DataContext is UpdateService updates) updates.Later();
     }
+
+    private void OnNever(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is UpdateService updates) updates.Never();
+    }
 }

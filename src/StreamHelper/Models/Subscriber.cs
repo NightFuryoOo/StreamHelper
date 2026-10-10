@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Collections.Generic;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -16,6 +18,9 @@ public enum SubscriptionKind
 
 public sealed class Subscriber : ISeenItem, ISelectable
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+
     private bool _seen;
     private bool _selected;
 

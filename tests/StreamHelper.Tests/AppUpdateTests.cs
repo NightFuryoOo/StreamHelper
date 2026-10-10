@@ -28,6 +28,9 @@ public class AppUpdateTests
     [InlineData("V2.0.0", "2.0.0.0")]
     [InlineData("1.2", "1.2.0.0")]
     [InlineData(" v1.0.0.0 ", "1.0.0.0")]
+    [InlineData("v.1.0.0.1", "1.0.0.1")]
+    [InlineData("v-1.0.0.2", "1.0.0.2")]
+    [InlineData("V 1.0.0.3", "1.0.0.3")]
     public void Tags_become_four_part_versions(string tag, string expected)
     {
         Assert.Equal(Version.Parse(expected), AppUpdate.ParseVersion(tag));
@@ -264,8 +267,20 @@ public class UpdateInstallerTests
         Assert.Null(UpdateInstaller.TakeMarker(dir.Path));
         UpdateInstaller.WriteMarker(dir.Path, "1.0.0.1");
 
-        Assert.Equal("1.0.0.1", UpdateInstaller.TakeMarker(dir.Path));
+        Assert.Equal(new UpdateMarker("1.0.0.1", false), UpdateInstaller.TakeMarker(dir.Path));
         Assert.Null(UpdateInstaller.TakeMarker(dir.Path));
+    }
+
+    [Fact]
+    public void A_version_chosen_by_hand_is_marked_and_an_old_plain_marker_still_reads()
+    {
+        using var dir = new TempDir();
+
+        UpdateInstaller.WriteMarker(dir.Path, "1.0.0.2", chosen: true);
+        Assert.Equal(new UpdateMarker("1.0.0.2", true), UpdateInstaller.TakeMarker(dir.Path));
+
+        File.WriteAllText(dir.File("update-done.txt"), "1.0.0.3\r\n");
+        Assert.Equal(new UpdateMarker("1.0.0.3", false), UpdateInstaller.TakeMarker(dir.Path));
     }
 
     private sealed class SyncProgress : IProgress<int>

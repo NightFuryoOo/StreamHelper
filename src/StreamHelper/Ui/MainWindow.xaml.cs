@@ -357,6 +357,19 @@ public partial class MainWindow : Window
         if (index >= 0) _services.ViewModel.ShowUndo($"Удалён фолловер: {follower.Name}", () => store.Restore(follower, index));
     }
 
+    private void OnDeleteMomentClick(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not ChannelMoment moment) return;
+        var store = _services.Moments;
+        moment.Selected = false;
+        var index = store.Remove(moment);
+        if (index >= 0) _services.ViewModel.ShowUndo($"Удалено: {moment.Name} ({moment.KindText})", () => store.Restore(moment, index));
+    }
+
+    private void OnSelectAllMomentsClick(object sender, RoutedEventArgs e) => _services.ViewModel.MomentSelection.ToggleAll();
+
+    private void OnDeleteSelectedMomentsClick(object sender, RoutedEventArgs e) => _services.ViewModel.DeleteSelectedMoments();
+
     private void OnUndoClick(object sender, RoutedEventArgs e) => _services.ViewModel.Undo();
 
     private void OnRenameClick(object sender, RoutedEventArgs e)

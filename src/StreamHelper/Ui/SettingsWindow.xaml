@@ -8,16 +8,7 @@
         FontFamily="Segoe UI" FontSize="13">
 
     <Window.Resources>
-        <DataTemplate x:Key="CrossIcon">
-            <Path Data="M8,1.5 A6.5,6.5 0 1 1 8,14.5 A6.5,6.5 0 1 1 8,1.5 M5.6,5.6 L10.4,10.4 M10.4,5.6 L5.6,10.4"
-                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
-                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                  Width="16" Height="16" Stretch="None"/>
-        </DataTemplate>
-        <Style x:Key="CrossButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
-            <Setter Property="Padding" Value="3"/>
-            <Setter Property="ContentTemplate" Value="{StaticResource CrossIcon}"/>
-        </Style>
+
         <Style x:Key="ResetHotkeyButton" TargetType="Button" BasedOn="{StaticResource CrossButton}">
             <Setter Property="Margin" Value="0,0,3,0"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -104,6 +95,32 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ChoiceChip" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#B7BDCB"/>
+            <Setter Property="Background" Value="#323744"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="0,6,6,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="Margin" Value="0,10,0,3"/>
@@ -143,6 +160,8 @@
                              Content="Награды" AutomationProperties.Name="Награды" Checked="OnSectionChecked"/>
                 <RadioButton x:Name="TabPings" Style="{StaticResource TabButton}" GroupName="sections" Tag="6" Margin="2,0,0,0"
                              Content="Пинги" AutomationProperties.Name="Пинги" Checked="OnSectionChecked"/>
+                <RadioButton x:Name="TabMoments" Style="{StaticResource TabButton}" GroupName="sections" Tag="8" Margin="2,0,0,0"
+                             Content="Рейды и стрики" AutomationProperties.Name="Рейды и стрики" Checked="OnSectionChecked"/>
                 <RadioButton x:Name="TabChat" Style="{StaticResource TabButton}" GroupName="sections" Tag="7" Margin="2,0,0,0"
                              Content="Чат" AutomationProperties.Name="Чат" Checked="OnSectionChecked"/>
             </WrapPanel>
@@ -161,6 +180,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -202,32 +222,38 @@
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="Pings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                         </Grid>
-                        <TextBlock Grid.Row="5" Text="Настройки" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="5" Text="Рейды и стрики" VerticalAlignment="Center" Margin="0,6,0,0"/>
                         <Grid Grid.Row="5" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                            <TextBox x:Name="HotkeyMomentsBox" Tag="Moments" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                            <Button Tag="Moments" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                        </Grid>
+                        <TextBlock Grid.Row="6" Text="Настройки" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <Grid Grid.Row="6" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
                             <TextBox x:Name="HotkeySettingsBox" Tag="Settings" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="Settings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                         </Grid>
-                        <TextBlock Grid.Row="6" Text="Скрыть уведомления" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="6" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                        <TextBlock Grid.Row="7" Text="Скрыть уведомления" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <Grid Grid.Row="7" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
                             <TextBox x:Name="HotkeyHideToastsBox" Tag="HideToasts" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="HideToasts" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                         </Grid>
-                        <TextBlock Grid.Row="7" Text="Чат: управление мышью" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="7" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                        <TextBlock Grid.Row="8" Text="Чат: управление мышью" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <Grid Grid.Row="8" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
                             <TextBox x:Name="HotkeyChatBox" Tag="ChatInteract" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="ChatInteract" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                         </Grid>
-                        <TextBlock Grid.Row="8" Text="Чат: показать / скрыть" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="8" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                        <TextBlock Grid.Row="9" Text="Чат: показать / скрыть" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <Grid Grid.Row="9" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
                             <TextBox x:Name="HotkeyChatToggleBox" Tag="ChatToggle" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="ChatToggle" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                         </Grid>
-                        <TextBlock Grid.Row="9" Text="Звуки наград: выкл / вкл" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="9" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                        <TextBlock Grid.Row="10" Text="Звуки наград: выкл / вкл" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <Grid Grid.Row="10" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
                             <TextBox x:Name="HotkeyRewardSoundsBox" Tag="RewardSoundsMute" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
                                      PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
                             <Button Tag="RewardSoundsMute" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
@@ -289,6 +315,17 @@
                                 Margin="8,0,0,0" Click="OnToastPosition"/>
                         <Button Style="{StaticResource FlatButton}" Content="Сбросить положение" Margin="8,0,0,0"
                                 Click="OnToastResetPosition"/>
+                    </StackPanel>
+
+                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
+
+                    <StackPanel x:Name="VersionBlock">
+                        <TextBlock Text="Версия программы" Style="{StaticResource Heading}"/>
+                        <TextBlock Text="{Binding CurrentText}" Margin="0,8,0,0"/>
+                        <TextBlock Text="{Binding AvailableText}" Foreground="{StaticResource AccentBrush}" Margin="0,2,0,0"
+                                   Visibility="{Binding HasAvailable, Converter={StaticResource BoolVis}}"/>
+                        <Button Style="{StaticResource PrimaryButton}" Content="Выбрать версию…" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                Click="OnChooseVersion"/>
                     </StackPanel>
 
                     <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
@@ -390,6 +427,18 @@
                         <Button x:Name="TwitchConnectButton" Style="{StaticResource PrimaryButton}" Content="Подключить Twitch"
                                 Click="OnTwitchConnect"/>
                         <Button Style="{StaticResource FlatButton}" Content="Отключить" Margin="8,0,0,0" Click="OnTwitchDisconnect"/>
+                    </StackPanel>
+
+                    <StackPanel x:Name="ChannelBlock" Margin="0,18,0,0" Visibility="Collapsed">
+                        <DockPanel>
+                            <Button x:Name="ChannelRefreshButton" DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Обновить список"
+                                    Padding="8,0" Click="OnRefreshChannels"/>
+                            <TextBlock Text="Канал" Style="{StaticResource Heading}" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <WrapPanel x:Name="ChannelChoices" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="ChannelStatusText" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                        <TextBlock Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Text="На канале, где ты модератор, работают чат поверх игры, бан и мут, «Отметить», пинги, рейды и стрики и фолловеры. Подписки, награды за баллы, опросы и предикты остаются только на своём канале."/>
                     </StackPanel>
 
                 </StackPanel>
@@ -634,6 +683,13 @@
                               AutomationProperties.Name="Выключить звуки всех наград" Click="OnRewardSoundsMutedClick"/>
                     <TextBlock Text="Пока звуки выключены, в углу экрана виден значок. Клавиша — на вкладке «Общие»."
                                Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <CheckBox x:Name="MuteRewardsOffCheck" Margin="0,10,0,0" AutomationProperties.Name="Выключать на это время награды со звуком"
+                              Checked="OnMuteRewardsOffChanged" Unchecked="OnMuteRewardsOffChanged">
+                        <TextBlock TextWrapping="Wrap" Text="Выключать на это время награды со звуком"/>
+                    </CheckBox>
+                    <TextBlock Text="Награды из списка «Звук заказа награды» выше выключаются на Twitch, пока звуки выключены, и включаются обратно вместе со звуками: зрители их не видят и не тратят баллы. Twitch разрешает это только для наград, созданных программой."
+                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="MuteRewardsStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
                     <CheckBox x:Name="MuteBadgeHiddenCheck" Content="Выключить отображение иконки" Margin="0,10,0,0"
                               AutomationProperties.Name="Выключить отображение иконки" Click="OnMuteBadgeHiddenClick"/>
                     <TextBlock x:Name="MuteBadgeHiddenWarning" Text="Не забывайте включать алёрты назад: с этой настройкой иконки напоминания не будет!"
@@ -696,7 +752,35 @@
                         <TextBox x:Name="PingIgnoredInput" AutomationProperties.Name="Аккаунт, который не считать" PreviewKeyDown="OnPingIgnoredKeyDown"
                                  ToolTip="Логин аккаунта (@ и заглавные буквы не важны). Можно вставить сразу несколько через запятую."/>
                     </DockPanel>
-                    <ItemsControl x:Name="PingIgnoredList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>                </StackPanel>
+                    <ItemsControl x:Name="PingIgnoredList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>
+                </StackPanel>
+
+                <StackPanel x:Name="SectionMoments" Style="{StaticResource SectionPanel}">
+                    <TextBlock Text="Рейды и стрики" Style="{StaticResource Heading}"/>
+
+                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
+                        <Ellipse x:Name="MomentsStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
+                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="MomentsStatusText" Text="Рейды и стрики: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,10,0,0" LastChildFill="True">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
+                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовый рейд" AutomationProperties.Name="Добавить тестовый рейд" Click="OnAddTestRaid"/>
+                        <CheckBox x:Name="RaidsCheck" Click="OnOptionsChanged" AutomationProperties.Name="Уведомлять о рейдах">
+                            <TextBlock TextWrapping="Wrap" Text="Уведомлять о рейдах"/>
+                        </CheckBox>
+                    </DockPanel>
+                    <DockPanel Margin="0,10,0,0" LastChildFill="True">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
+                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовый стрик" AutomationProperties.Name="Добавить тестовый стрик" Click="OnAddTestStreak"/>
+                        <CheckBox x:Name="StreaksCheck" Click="OnOptionsChanged" AutomationProperties.Name="Уведомлять о стриках">
+                            <TextBlock TextWrapping="Wrap" Text="Уведомлять о стриках"/>
+                        </CheckBox>
+                    </DockPanel>
+                    <TextBlock Text="Стрик: зритель отметил в чате, сколько стримов подряд он смотрит." Foreground="{StaticResource MutedBrush}"
+                               Margin="0,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
 
                 <StackPanel x:Name="SectionChat" Style="{StaticResource SectionPanel}">
                     <TextBlock Text="Чат Twitch" Style="{StaticResource Heading}"/>

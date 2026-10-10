@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -33,6 +34,14 @@ public sealed record TwitchEndpoints(
     public string StreamsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/streams";
 
     public string ModerationBansUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/bans";
+
+    public string PollsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/polls";
+
+    public string PredictionsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/predictions";
+
+    public string ShoutoutsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/shoutouts";
+
+    public string ModeratedChannelsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/channels";
 
     public static TwitchEndpoints FromBase(string baseUrl)
     {
@@ -105,7 +114,7 @@ public enum RedemptionUpdateOutcome
 
 public sealed record RedemptionUpdateResult(RedemptionUpdateOutcome Outcome, string Message);
 
-public sealed record RewardToggleResult(bool Success, string Message);
+public sealed record RewardToggleResult(bool Success, string Message, bool Missing = false);
 
 public enum RewardRenameOutcome
 {
@@ -138,11 +147,44 @@ public interface IRewardApi
 
 public sealed record ModerationResult(bool Success, string Message);
 
+public sealed record ModeratedChannel(string Id, string Login, string Name)
+{
+    public string Label => Name.Length > 0 ? Name : Login;
+}
+
 public interface IModerationApi
 {
     Task<ModerationResult> BanAsync(string userId, int? durationSeconds, CancellationToken ct);
 
     Task<ModerationResult> UnbanAsync(string userId, CancellationToken ct);
+
+    Task<ModerationResult> ShoutoutAsync(string userId, CancellationToken ct);
+}
+
+public sealed record VoteResult(bool Success, string Message, ChannelVote? Vote = null);
+
+public enum PredictionChange
+{
+    Lock,
+    Resolve,
+    Cancel,
+}
+
+public interface IVoteApi
+{
+    Task<ChannelVote?> GetLatestPollAsync(CancellationToken ct);
+
+    Task<ChannelVote?> GetLatestPredictionAsync(CancellationToken ct);
+
+    Task<ChannelVote?> GetLastEndedAsync(VoteKind kind, CancellationToken ct);
+
+    Task<VoteResult> CreatePollAsync(PollDraft draft, CancellationToken ct);
+
+    Task<VoteResult> EndPollAsync(string pollId, CancellationToken ct);
+
+    Task<VoteResult> CreatePredictionAsync(PredictionDraft draft, CancellationToken ct);
+
+    Task<VoteResult> ChangePredictionAsync(string predictionId, PredictionChange change, string? winnerId, CancellationToken ct);
 }
 
 public interface IBadgeApi
@@ -169,7 +211,7 @@ public interface IFollowerSource
     Task<FollowerPage> GetFollowersAsync(string? cursor, CancellationToken ct);
 }
 
-public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi
+public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi, IVoteApi
 {
     public const string FollowerScope = "moderator:read:followers";
     public const string SubscriptionScope = "channel:read:subscriptions";
@@ -177,7 +219,12 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
     public const string ManageScope = "channel:manage:redemptions";
     public const string ChatScope = "user:read:chat";
     public const string ModerateScope = "moderator:manage:banned_users";
-    public const string Scopes = FollowerScope + " " + SubscriptionScope + " " + RedemptionScope + " " + ManageScope + " " + ChatScope + " " + ModerateScope;
+    public const string PollScope = "channel:manage:polls";
+    public const string PredictionScope = "channel:manage:predictions";
+    public const string ShoutoutScope = "moderator:manage:shoutouts";
+    public const string ModeratedChannelsScope = "user:read:moderated_channels";
+    public const string Scopes = FollowerScope + " " + SubscriptionScope + " " + RedemptionScope + " " + ManageScope + " " + ChatScope + " " + ModerateScope +
+                                 " " + PollScope + " " + PredictionScope + " " + ShoutoutScope + " " + ModeratedChannelsScope;
     private const string DeviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 
     private readonly SettingsStore _store;
@@ -335,14 +382,13 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
         if (!Settings.HasModerationScope) return new ModerationResult(false, "Нужно переподключить Twitch: новое право на модерацию.");
         if (userId.Length == 0) return new ModerationResult(false, "Не знаю, кого именно.");
 
-        var own = Uri.EscapeDataString(Settings.TwitchUserId);
-        var url = $"{_endpoints.ModerationBansUrl}?broadcaster_id={own}&moderator_id={own}";
+        var url = $"{_endpoints.ModerationBansUrl}?broadcaster_id={Uri.EscapeDataString(Settings.ChannelId)}&moderator_id={Uri.EscapeDataString(Settings.TwitchUserId)}";
         if (method == HttpMethod.Delete) url += "&user_id=" + Uri.EscapeDataString(userId);
         try
         {
             var (status, body) = await CallWithRefreshAsync((token, c) => SendJsonAsync(method, url, token, json, c), ct);
             if (status == success) return new ModerationResult(true, "");
-            return new ModerationResult(false, DescribeModerationFailure(status, ReadMessage(body)));
+            return new ModerationResult(false, DescribeModerationFailure(status, ReadMessage(body), OtherChannel));
         }
         catch (AuthRequiredException ex)
         {
@@ -354,8 +400,62 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
         }
     }
 
-    internal static string DescribeModerationFailure(HttpStatusCode status, string message)
+    public async Task<ModerationResult> ShoutoutAsync(string userId, CancellationToken ct)
     {
+        if (!Settings.HasShoutoutScope) return new ModerationResult(false, "Нужно переподключить Twitch: новое право на отметки.");
+        if (userId.Length == 0) return new ModerationResult(false, "Не знаю, кого именно.");
+
+        var url = $"{_endpoints.ShoutoutsUrl}?from_broadcaster_id={Uri.EscapeDataString(Settings.ChannelId)}&to_broadcaster_id={Uri.EscapeDataString(userId)}" +
+                  $"&moderator_id={Uri.EscapeDataString(Settings.TwitchUserId)}";
+        try
+        {
+            var (status, body) = await CallWithRefreshAsync((token, c) => SendJsonAsync(HttpMethod.Post, url, token, null, c), ct);
+            if (status is HttpStatusCode.NoContent or HttpStatusCode.OK) return new ModerationResult(true, "");
+            return new ModerationResult(false, DescribeShoutoutFailure(status, ReadMessage(body), OtherChannel));
+        }
+        catch (AuthRequiredException ex)
+        {
+            return new ModerationResult(false, ex.Message);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new ModerationResult(false, "Нет связи с Twitch: " + ex.Message);
+        }
+    }
+
+    private string? OtherChannel => Settings.IsOwnChannel ? null : Settings.ChannelLabel;
+
+    internal static string DescribeShoutoutFailure(HttpStatusCode status, string message, string? otherChannel = null)
+    {
+        if (status == HttpStatusCode.BadRequest)
+        {
+            if (message.Contains("live", StringComparison.OrdinalIgnoreCase) || message.Contains("viewers", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Отметить можно только во время стрима, когда на нём есть зрители.";
+            }
+            if (message.Contains("themselves", StringComparison.OrdinalIgnoreCase)) return "Себя отметить нельзя.";
+            return message.Length > 0 ? "Twitch отказал: " + message : "Twitch отказал.";
+        }
+        if (status == HttpStatusCode.Unauthorized) return "Twitch не разрешил: переподключи Twitch (нужно право на отметки).";
+        if (status == HttpStatusCode.Forbidden)
+        {
+            if (!message.Contains("moderator", StringComparison.OrdinalIgnoreCase)) return "Twitch не разрешает отметить этого пользователя.";
+            return otherChannel != null
+                ? $"Twitch не разрешил: ты не модератор канала {otherChannel}."
+                : "Twitch не разрешил: подключи Twitch аккаунтом владельца канала.";
+        }
+        if (status == (HttpStatusCode)429)
+        {
+            return message.Contains("same broadcaster", StringComparison.OrdinalIgnoreCase)
+                ? "Этого уже отмечали за последний час."
+                : "Отмечать можно раз в 2 минуты, подожди.";
+        }
+        return $"Twitch: HTTP {(int)status}.";
+    }
+
+    internal static string DescribeModerationFailure(HttpStatusCode status, string message, string? otherChannel = null)
+    {
+        if (status == HttpStatusCode.Forbidden && otherChannel != null) return $"Twitch не разрешил: ты не модератор канала {otherChannel}.";
         if (status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
             return "Twitch не разрешил: переподключи Twitch (нужно право на модерацию).";
@@ -371,10 +471,62 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
         return $"Twitch: HTTP {(int)status}.";
     }
 
+    public async Task<IReadOnlyList<ModeratedChannel>> GetModeratedChannelsAsync(CancellationToken ct)
+    {
+        if (!Settings.HasModeratedChannelsScope)
+        {
+            throw new AuthRequiredException("Чтобы работать в чате канала, где ты модератор, переподключи Twitch: нужно новое право.");
+        }
+
+        var channels = new List<ModeratedChannel>();
+        string? cursor = null;
+        for (var page = 0; page < 10; page++)
+        {
+            var url = $"{_endpoints.ModeratedChannelsUrl}?user_id={Uri.EscapeDataString(Settings.TwitchUserId)}&first=100";
+            if (cursor != null) url += "&after=" + Uri.EscapeDataString(cursor);
+            var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+            ThrowIfUnauthorized(status, "Twitch не отдал список каналов, где ты модератор: переподключи Twitch.");
+            if (status == (HttpStatusCode)429) throw new HttpRequestException("Twitch: слишком много запросов (HTTP 429).");
+            if (status != HttpStatusCode.OK) throw new HttpRequestException($"Twitch: HTTP {(int)status}.");
+            var (items, next) = ParseModeratedChannels(body);
+            channels.AddRange(items);
+            if (string.IsNullOrEmpty(next) || items.Count == 0) break;
+            cursor = next;
+        }
+        return channels
+            .Where(c => c.Id != Settings.TwitchUserId)
+            .GroupBy(c => c.Id)
+            .Select(g => g.First())
+            .OrderBy(c => c.Label, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    public static (IReadOnlyList<ModeratedChannel> Items, string? Cursor) ParseModeratedChannels(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var items = new List<ModeratedChannel>();
+        if (doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in data.EnumerateArray())
+            {
+                var id = ReadString(element, "broadcaster_id");
+                if (id.Length == 0) continue;
+                items.Add(new ModeratedChannel(id, ReadString(element, "broadcaster_login"), ReadString(element, "broadcaster_name")));
+            }
+        }
+        string? cursor = null;
+        if (doc.RootElement.TryGetProperty("pagination", out var pagination) && pagination.ValueKind == JsonValueKind.Object)
+        {
+            var value = ReadString(pagination, "cursor");
+            if (value.Length > 0) cursor = value;
+        }
+        return (items, cursor);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetBadgeImagesAsync(CancellationToken ct)
     {
         var urls = new List<string> { _endpoints.ChatBadgesUrl + "/global" };
-        if (Settings.TwitchUserId.Length > 0) urls.Add(_endpoints.ChatBadgesUrl + "?broadcaster_id=" + Uri.EscapeDataString(Settings.TwitchUserId));
+        if (Settings.ChannelId.Length > 0) urls.Add(_endpoints.ChatBadgesUrl + "?broadcaster_id=" + Uri.EscapeDataString(Settings.ChannelId));
 
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var url in urls)
@@ -390,7 +542,7 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
 
     public async Task<DateTime?> GetStreamStartAsync(CancellationToken ct)
     {
-        var url = _endpoints.StreamsUrl + "?user_id=" + Uri.EscapeDataString(Settings.TwitchUserId);
+        var url = _endpoints.StreamsUrl + "?user_id=" + Uri.EscapeDataString(Settings.ChannelId);
         var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
         ThrowIfUnauthorized(status, "Twitch не сказал, идёт ли стрим: переподключи Twitch.");
         if (status == (HttpStatusCode)429) throw new HttpRequestException("Twitch: слишком много запросов (HTTP 429).");
@@ -547,7 +699,7 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
         return status switch
         {
             HttpStatusCode.OK => new RewardToggleResult(true, ""),
-            HttpStatusCode.NotFound => new RewardToggleResult(false, "Этой награды уже нет на канале."),
+            HttpStatusCode.NotFound => new RewardToggleResult(false, "Этой награды уже нет на канале.", Missing: true),
             HttpStatusCode.Forbidden => new RewardToggleResult(false, "Twitch разрешает менять эту награду только там, где её создали."),
             HttpStatusCode.Unauthorized => throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужно право channel:manage:redemptions)."),
             (HttpStatusCode)429 => new RewardToggleResult(false, "Twitch: слишком много запросов, попробуй через минуту."),
@@ -574,6 +726,130 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
             HttpStatusCode.Unauthorized => throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужно право channel:manage:redemptions)."),
             (HttpStatusCode)429 => new RewardRenameResult(RewardRenameOutcome.Failed, "Twitch: слишком много запросов, попробуй через минуту."),
             _ => new RewardRenameResult(RewardRenameOutcome.Failed, $"Twitch: HTTP {(int)status}. {message}".Trim()),
+        };
+    }
+
+    public Task<ChannelVote?> GetLatestPollAsync(CancellationToken ct) =>
+        Settings.HasPollScope ? GetLatestVoteAsync(_endpoints.PollsUrl, VoteParsing.ParsePolls, ct) : Task.FromResult<ChannelVote?>(null);
+
+    public Task<ChannelVote?> GetLatestPredictionAsync(CancellationToken ct) =>
+        Settings.HasPredictionScope ? GetLatestVoteAsync(_endpoints.PredictionsUrl, VoteParsing.ParsePredictions, ct) : Task.FromResult<ChannelVote?>(null);
+
+    public async Task<ChannelVote?> GetLastEndedAsync(VoteKind kind, CancellationToken ct)
+    {
+        var poll = kind == VoteKind.Poll;
+        RequireVoteScope(poll ? Settings.HasPollScope : Settings.HasPredictionScope, poll ? "опросы" : "предикты");
+        var url = $"{(poll ? _endpoints.PollsUrl : _endpoints.PredictionsUrl)}?broadcaster_id={Uri.EscapeDataString(Settings.TwitchUserId)}&first=10";
+        var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+        switch (status)
+        {
+            case HttpStatusCode.OK:
+                var votes = poll ? VoteParsing.ParsePolls(body) : VoteParsing.ParsePredictions(body);
+                return votes.FirstOrDefault(v => v.Stage == VoteStage.Ended);
+            case HttpStatusCode.Forbidden:
+            case HttpStatusCode.NotFound:
+                return null;
+            case HttpStatusCode.Unauthorized:
+                throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужны права на опросы и предикты).");
+            default:
+                throw new HttpRequestException($"Twitch: HTTP {(int)status}. {ReadMessage(body)}".Trim());
+        }
+    }
+
+    public Task<VoteResult> CreatePollAsync(PollDraft draft, CancellationToken ct)
+    {
+        RequireVoteScope(Settings.HasPollScope, "опросы");
+        var body = new Dictionary<string, object>
+        {
+            ["broadcaster_id"] = Settings.TwitchUserId,
+            ["title"] = draft.Title,
+            ["choices"] = draft.Choices.Select(title => new Dictionary<string, string> { ["title"] = title }).ToList(),
+            ["duration"] = draft.Seconds,
+        };
+        if (draft.PointsVoting)
+        {
+            body["channel_points_voting_enabled"] = true;
+            body["channel_points_per_vote"] = draft.PointsPerVote;
+        }
+        return SendVoteAsync(HttpMethod.Post, _endpoints.PollsUrl, body, VoteParsing.ParsePolls, ct);
+    }
+
+    public Task<VoteResult> EndPollAsync(string pollId, CancellationToken ct)
+    {
+        RequireVoteScope(Settings.HasPollScope, "опросы");
+        var body = new Dictionary<string, object> { ["broadcaster_id"] = Settings.TwitchUserId, ["id"] = pollId, ["status"] = "TERMINATED" };
+        return SendVoteAsync(HttpMethod.Patch, _endpoints.PollsUrl, body, VoteParsing.ParsePolls, ct);
+    }
+
+    public Task<VoteResult> CreatePredictionAsync(PredictionDraft draft, CancellationToken ct)
+    {
+        RequireVoteScope(Settings.HasPredictionScope, "предикты");
+        var body = new Dictionary<string, object>
+        {
+            ["broadcaster_id"] = Settings.TwitchUserId,
+            ["title"] = draft.Title,
+            ["outcomes"] = draft.Outcomes.Select(title => new Dictionary<string, string> { ["title"] = title }).ToList(),
+            ["prediction_window"] = draft.Seconds,
+        };
+        return SendVoteAsync(HttpMethod.Post, _endpoints.PredictionsUrl, body, VoteParsing.ParsePredictions, ct);
+    }
+
+    public Task<VoteResult> ChangePredictionAsync(string predictionId, PredictionChange change, string? winnerId, CancellationToken ct)
+    {
+        RequireVoteScope(Settings.HasPredictionScope, "предикты");
+        var body = new Dictionary<string, object>
+        {
+            ["broadcaster_id"] = Settings.TwitchUserId,
+            ["id"] = predictionId,
+            ["status"] = change switch
+            {
+                PredictionChange.Lock => "LOCKED",
+                PredictionChange.Resolve => "RESOLVED",
+                _ => "CANCELED",
+            },
+        };
+        if (change == PredictionChange.Resolve) body["winning_outcome_id"] = winnerId ?? "";
+        return SendVoteAsync(HttpMethod.Patch, _endpoints.PredictionsUrl, body, VoteParsing.ParsePredictions, ct);
+    }
+
+    private static void RequireVoteScope(bool granted, string what)
+    {
+        if (!granted) throw new AuthRequiredException($"Переподключи Twitch в настройках, вкладка «Twitch»: нужно право на {what}.");
+    }
+
+    private async Task<ChannelVote?> GetLatestVoteAsync(string baseUrl, Func<string, IReadOnlyList<ChannelVote>> parse, CancellationToken ct)
+    {
+        var url = $"{baseUrl}?broadcaster_id={Uri.EscapeDataString(Settings.TwitchUserId)}&first=1";
+        var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+        switch (status)
+        {
+            case HttpStatusCode.OK:
+                return parse(body).FirstOrDefault();
+            case HttpStatusCode.Forbidden:
+            case HttpStatusCode.NotFound:
+                return null;
+            case HttpStatusCode.Unauthorized:
+                throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужны права на опросы и предикты).");
+            default:
+                throw new HttpRequestException($"Twitch: HTTP {(int)status}. {ReadMessage(body)}".Trim());
+        }
+    }
+
+    private async Task<VoteResult> SendVoteAsync(
+        HttpMethod method, string url, Dictionary<string, object> body, Func<string, IReadOnlyList<ChannelVote>> parse, CancellationToken ct)
+    {
+        var json = JsonSerializer.Serialize(body);
+        var (status, response) = await CallWithRefreshAsync((token, c) => SendJsonAsync(method, url, token, json, c), ct);
+        var message = ReadMessage(response);
+        return status switch
+        {
+            HttpStatusCode.OK => new VoteResult(true, "", parse(response).FirstOrDefault()),
+            HttpStatusCode.BadRequest => new VoteResult(false, $"Twitch не принял: {message}".Trim()),
+            HttpStatusCode.Forbidden => new VoteResult(false, "Twitch отказал: опросы и предикты есть только у компаньонов и партнёров Twitch."),
+            HttpStatusCode.NotFound => new VoteResult(false, "Этого уже нет на канале."),
+            HttpStatusCode.Unauthorized => throw new AuthRequiredException("Twitch отклонил вход: переподключи Twitch в настройках (нужны права на опросы и предикты)."),
+            (HttpStatusCode)429 => new VoteResult(false, "Twitch: слишком много запросов, попробуй через минуту."),
+            _ => new VoteResult(false, $"Twitch: HTTP {(int)status}. {message}".Trim()),
         };
     }
 
@@ -662,8 +938,8 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
 
     private async Task<(HttpStatusCode, string)> PostSubscriptionAsync(string type, string sessionId, string token, CancellationToken ct)
     {
-        object condition = type == EventSubParser.ChatMessageType
-            ? new { broadcaster_user_id = Settings.TwitchUserId, user_id = Settings.TwitchUserId }
+        object condition = type is EventSubParser.ChatMessageType or EventSubParser.ChatNoticeType
+            ? new { broadcaster_user_id = Settings.ChannelId, user_id = Settings.TwitchUserId }
             : new { broadcaster_user_id = Settings.TwitchUserId };
         var json = JsonSerializer.Serialize(new
         {
@@ -684,7 +960,7 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
 
     private async Task<(HttpStatusCode, string)> GetFollowersRawAsync(string? cursor, string token, CancellationToken ct)
     {
-        var url = $"{_endpoints.FollowersUrl}?broadcaster_id={Uri.EscapeDataString(Settings.TwitchUserId)}&first=100";
+        var url = $"{_endpoints.FollowersUrl}?broadcaster_id={Uri.EscapeDataString(Settings.ChannelId)}&first=100";
         if (!string.IsNullOrEmpty(cursor)) url += "&after=" + Uri.EscapeDataString(cursor);
         return await GetAsync(url, token, ct);
     }
@@ -701,6 +977,9 @@ public sealed class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IB
             Settings.FollowersBaselined = false;
             Settings.LastFollowerAtUtc = default;
             Settings.LastFollowerUserIds = new List<string>();
+            Settings.TwitchChannelId = "";
+            Settings.TwitchChannelLogin = "";
+            Settings.TwitchChannelName = "";
         }
         Settings.TwitchUserId = userId;
         Settings.TwitchLogin = ReadString(first, "login");

@@ -44,6 +44,7 @@ public static class RewardCleanup
         var gone = deletedIds.ToHashSet(StringComparer.Ordinal);
         settings.ManagedRewardIds = settings.ManagedRewardIds.Where(id => !gone.Contains(id)).ToList();
         settings.HiddenRewardIds = settings.HiddenRewardIds.Where(id => !gone.Contains(id)).ToList();
+        settings.MuteSwitchedOffRewardIds = settings.MuteSwitchedOffRewardIds.Where(id => !gone.Contains(id)).ToList();
         foreach (var key in settings.RewardCopies.Where(pair => gone.Contains(pair.Value)).Select(pair => pair.Key).ToList())
         {
             settings.RewardCopies.Remove(key);

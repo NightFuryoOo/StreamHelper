@@ -208,7 +208,7 @@ public class BulkDeleteViewModelTests
         var order = followers.Items.Select(f => f.UserId).ToArray();
         var viewModel = new MainViewModel(
             new DonationStore(dir.File("d.json")), followers, new SubscriberStore(dir.File("s.json")),
-            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), 1);
+            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), new MomentStore(dir.File("m.json")), 1);
         followers.Items[0].Selected = true;
         followers.Items[2].Selected = true;
 
@@ -233,7 +233,7 @@ public class BulkDeleteViewModelTests
         pings.AddRange(new[] { new ChatPing { Key = "a", DisplayName = "Anna", Message = "@s hi", AtUtc = MakeFollower.T0 } });
         var viewModel = new MainViewModel(
             new DonationStore(dir.File("d.json")), new FollowerStore(dir.File("f.json")), new SubscriberStore(dir.File("s.json")),
-            new RedemptionStore(dir.File("r.json")), pings, 4);
+            new RedemptionStore(dir.File("r.json")), pings, new MomentStore(dir.File("m.json")), 4);
 
         viewModel.DeleteSelectedPings();
         Assert.Single(pings.Items);
@@ -258,7 +258,7 @@ public class BulkDeleteViewModelTests
         });
         var viewModel = new MainViewModel(
             new DonationStore(dir.File("d.json")), new FollowerStore(dir.File("f.json")), new SubscriberStore(dir.File("s.json")),
-            rewards, new PingStore(dir.File("p.json")), 3);
+            rewards, new PingStore(dir.File("p.json")), new MomentStore(dir.File("m.json")), 3);
 
         viewModel.BeginRewardsRejectConfirm();
         Assert.False(viewModel.ConfirmingRewardsReject);
@@ -289,7 +289,7 @@ public class BulkDeleteViewModelTests
         var order = subscribers.Items.Select(s => s.Key).ToArray();
         var viewModel = new MainViewModel(
             new DonationStore(dir.File("d.json")), new FollowerStore(dir.File("f.json")), subscribers,
-            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), 2);
+            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), new MomentStore(dir.File("m.json")), 2);
 
         viewModel.SubscriberSelection.ToggleAll();
         Assert.Equal(3, viewModel.SubscriberSelection.Count);
@@ -321,7 +321,7 @@ public class BulkDeleteViewModelTests
         var order = donations.Items.Select(d => d.Id).ToArray();
         var viewModel = new MainViewModel(
             donations, new FollowerStore(dir.File("f.json")), new SubscriberStore(dir.File("s.json")),
-            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), 0);
+            new RedemptionStore(dir.File("r.json")), new PingStore(dir.File("p.json")), new MomentStore(dir.File("m.json")), 0);
 
         donations.Items.Single(d => d.Id == 2).Selected = true;
         viewModel.DeleteSelectedDonations();

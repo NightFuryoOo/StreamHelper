@@ -44,6 +44,16 @@
             <Setter Property="Padding" Value="14,7"/>
         </Style>
 
+        <DataTemplate x:Key="CrossIcon">
+            <Path Data="M8,1.5 A6.5,6.5 0 1 1 8,14.5 A6.5,6.5 0 1 1 8,1.5 M5.6,5.6 L10.4,10.4 M10.4,5.6 L5.6,10.4"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                  Width="16" Height="16" Stretch="None"/>
+        </DataTemplate>
+        <Style x:Key="CrossButton" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+            <Setter Property="Padding" Value="3"/>
+            <Setter Property="ContentTemplate" Value="{StaticResource CrossIcon}"/>
+        </Style>
         <Style x:Key="SoftButton" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Background" Value="#2E333E"/>

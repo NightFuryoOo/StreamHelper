@@ -9,28 +9,43 @@ namespace StreamHelper.Sync;
 
 public sealed class PingListener : EventSubListener<ChatPing>
 {
-    public static readonly string[] PingTypes = { EventSubParser.ChatMessageType };
+    public static readonly string[] PingTypes = { EventSubParser.ChatMessageType, EventSubParser.ChatNoticeType };
 
     private static readonly EventSubFeature Feature = new(
         "Пинги",
         TwitchClient.ChatScope,
         PingTypes,
-        "Для пингов в чате переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.");
+        "Для пингов, рейдов и стриков переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.",
+        FollowsChannel: true);
 
     private readonly SettingsStore _settings;
     private readonly Action<ChatMessage>? _onChat;
+    private readonly Action<ChannelMoment>? _onMoment;
 
     public PingListener(
         SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<ChatPing>, Task> deliver,
-        Action<ChatMessage>? onChat = null)
+        Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null)
         : base(settings, api, url, Feature, deliver)
     {
         _settings = settings;
         _onChat = onChat;
+        _onMoment = onMoment;
     }
 
     protected override ChatPing? Select(EventSubMessage message)
     {
+        if (message.Moment is { } moment)
+        {
+            try
+            {
+                _onMoment?.Invoke(moment);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Raid or streak delivery failed: " + ex.Message);
+            }
+            return null;
+        }
         if (message.Chat is not { } chat) return null;
         try
         {

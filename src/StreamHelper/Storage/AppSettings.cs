@@ -35,6 +35,9 @@ internal static class Secrets
 
 public sealed class AppSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+
     public const uint ModAlt = 0x0001;
     public const uint ModControl = 0x0002;
     public const uint ModShift = 0x0004;
@@ -88,6 +91,36 @@ public sealed class AppSettings
     public string TwitchUserId { get; set; } = "";
     public string TwitchLogin { get; set; } = "";
     public string TwitchScopes { get; set; } = "";
+    public string TwitchChannelId { get; set; } = "";
+    public string TwitchChannelLogin { get; set; } = "";
+    public string TwitchChannelName { get; set; } = "";
+
+    [JsonIgnore] public bool IsOwnChannel => TwitchChannelId.Length == 0 || TwitchChannelId == TwitchUserId;
+
+    [JsonIgnore] public string ChannelId => IsOwnChannel ? TwitchUserId : TwitchChannelId;
+
+    [JsonIgnore] public string ChannelLabel => IsOwnChannel ? TwitchLogin : TwitchChannelName.Length > 0 ? TwitchChannelName : TwitchChannelLogin;
+
+    [JsonIgnore]
+    public string ConnectedText => IsOwnChannel ? $"Подключено · {TwitchLogin}" : $"Подключено · {TwitchLogin} · канал {ChannelLabel}";
+
+    public bool SelectChannel(string id, string login, string name)
+    {
+        if (id == TwitchUserId) id = login = name = "";
+        if (id == TwitchChannelId)
+        {
+            TwitchChannelLogin = login;
+            TwitchChannelName = name;
+            return false;
+        }
+        TwitchChannelId = id;
+        TwitchChannelLogin = login;
+        TwitchChannelName = name;
+        FollowersBaselined = false;
+        LastFollowerAtUtc = default;
+        LastFollowerUserIds = new List<string>();
+        return true;
+    }
 
     public bool FollowersBaselined { get; set; }
     public DateTime LastFollowerAtUtc { get; set; }
@@ -100,6 +133,8 @@ public sealed class AppSettings
     public bool NotifySubscribers { get; set; } = true;
     public bool NotifyRewards { get; set; } = true;
     public bool NotifyPings { get; set; } = true;
+    public bool NotifyRaids { get; set; } = true;
+    public bool NotifyStreaks { get; set; } = true;
 
     public static readonly string[] DefaultPingIgnored =
     {
@@ -132,6 +167,10 @@ public sealed class AppSettings
 
     public bool RewardSoundsMuted { get; set; }
 
+    public bool MuteSwitchesRewardsOff { get; set; } = true;
+
+    public List<string> MuteSwitchedOffRewardIds { get; set; } = new();
+
     public bool MuteBadgeHidden { get; set; }
 
     public bool CreditsCollapsed { get; set; }
@@ -142,6 +181,16 @@ public sealed class AppSettings
     public string RewardIconsFolder { get; set; } = "";
 
     public string ProfileFolder { get; set; } = "";
+
+    public string UpdateSkipVersion { get; set; } = "";
+
+    public int PollSeconds { get; set; } = 60;
+
+    public int PredictionSeconds { get; set; } = 120;
+
+    public bool PollPointsVoting { get; set; }
+
+    public int PollPointsPerVote { get; set; } = 100;
 
     public double ToastOpacity { get; set; } = 1.0;
     public double ToastScale { get; set; } = 1.0;
@@ -251,6 +300,18 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool HasModerationScope => HasScope("moderator:manage:banned_users");
+
+    [JsonIgnore]
+    public bool HasPollScope => HasScope("channel:manage:polls");
+
+    [JsonIgnore]
+    public bool HasPredictionScope => HasScope("channel:manage:predictions");
+
+    [JsonIgnore]
+    public bool HasShoutoutScope => HasScope("moderator:manage:shoutouts");
+
+    [JsonIgnore]
+    public bool HasModeratedChannelsScope => HasScope("user:read:moderated_channels");
 
     [JsonIgnore]
     public string RedirectUri => $"http://127.0.0.1:{RedirectPort}/callback";

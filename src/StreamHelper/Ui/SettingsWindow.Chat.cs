@@ -21,7 +21,7 @@ public partial class SettingsWindow
 
     private void ApplyChatStatus(SyncStatus status)
     {
-        ChatStatusText.Text = status.State == SyncState.Ok ? $"Подключено · {_services.Settings.Current.TwitchLogin}" : status.Message;
+        ChatStatusText.Text = status.State == SyncState.Ok ? _services.Settings.Current.ConnectedText : status.Message;
         ChatStatusDot.Fill = StatusBrush(status.State);
     }
 

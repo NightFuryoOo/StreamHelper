@@ -49,7 +49,7 @@ public static class Profile
 
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
-    public static readonly string[] ListFiles = { "donations.json", "followers.json", "subscribers.json", "redemptions.json", "pings.json" };
+    public static readonly string[] ListFiles = { "donations.json", "followers.json", "subscribers.json", "redemptions.json", "pings.json", "raids.json" };
 
     public static readonly string[] LocalSettings =
     {
@@ -72,6 +72,11 @@ public static class Profile
         nameof(AppSettings.TwitchRefreshTokenProtected),
         nameof(AppSettings.TwitchAccessTokenExpiresUtc),
         nameof(AppSettings.TwitchUserId),
+        nameof(AppSettings.TwitchChannelId),
+        nameof(AppSettings.TwitchChannelLogin),
+        nameof(AppSettings.TwitchChannelName),
+        nameof(AppSettings.UpdateSkipVersion),
+        nameof(AppSettings.MuteSwitchedOffRewardIds),
         nameof(AppSettings.TwitchLogin),
         nameof(AppSettings.TwitchScopes),
         nameof(AppSettings.FollowersBaselined),
@@ -90,6 +95,8 @@ public static class Profile
         nameof(AppSettings.NotifySubscribers),
         nameof(AppSettings.NotifyRewards),
         nameof(AppSettings.NotifyPings),
+        nameof(AppSettings.NotifyRaids),
+        nameof(AppSettings.NotifyStreaks),
         nameof(AppSettings.PingIgnoredChatters),
         nameof(AppSettings.PingWords),
         nameof(AppSettings.ChatHidden),
@@ -106,6 +113,7 @@ public static class Profile
         nameof(AppSettings.RewardSounds),
         nameof(AppSettings.SoundRewardIds),
         nameof(AppSettings.RewardSoundsMuted),
+        nameof(AppSettings.MuteSwitchesRewardsOff),
         nameof(AppSettings.MuteBadgeHidden),
         nameof(AppSettings.CreditsCollapsed),
         nameof(AppSettings.MuteBadgeScale),
@@ -125,6 +133,10 @@ public static class Profile
         nameof(AppSettings.WindowTop),
         nameof(AppSettings.WindowWidth),
         nameof(AppSettings.WindowHeight),
+        nameof(AppSettings.PollSeconds),
+        nameof(AppSettings.PredictionSeconds),
+        nameof(AppSettings.PollPointsVoting),
+        nameof(AppSettings.PollPointsPerVote),
     };
 
     public static string PendingPath(string dataDirectory) => Path.Combine(dataDirectory, PendingFileName);
@@ -233,6 +245,23 @@ public static class Profile
         finally
         {
             TryDelete(pending);
+        }
+    }
+
+    public static ProfileResult Backup(string dataDirectory, string title, string appVersion, DateTime now)
+    {
+        try
+        {
+            Directory.CreateDirectory(BackupsFolder(dataDirectory));
+            var path = Path.Combine(BackupsFolder(dataDirectory), $"{title} {now:yyyy-MM-dd HH-mm-ss}{Extension}");
+            var current = ReadCurrent(Path.Combine(dataDirectory, "settings.json"));
+            var saved = Export(path, current.ToJsonString(), dataDirectory, includeLists: true, appVersion, now.ToUniversalTime());
+            if (saved.Success) PruneBackups(dataDirectory);
+            return saved.Success ? saved with { BackupPath = path } : saved;
+        }
+        catch (Exception ex) when (IsFileProblem(ex))
+        {
+            return new ProfileResult(false, ex.Message);
         }
     }
 

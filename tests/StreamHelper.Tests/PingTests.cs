@@ -338,9 +338,8 @@ public class PingListenerTests
             Assert.True(await Wait.Until(() => Count(delivered) >= 2));
             await Task.Delay(300);
 
-            var call = Assert.Single(api.Calls);
-            Assert.Equal(EventSubParser.ChatMessageType, call.Type);
-            Assert.Equal("SESS-P", call.SessionId);
+            Assert.Equal(new[] { EventSubParser.ChatMessageType, EventSubParser.ChatNoticeType }, api.Calls.Select(c => c.Type).ToArray());
+            Assert.All(api.Calls, c => Assert.Equal("SESS-P", c.SessionId));
             Assert.Equal(2, Count(delivered));
             lock (delivered)
             {

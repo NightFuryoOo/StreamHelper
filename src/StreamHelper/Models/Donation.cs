@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Collections.Generic;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -15,6 +17,9 @@ public static class DonationSources
 
 public sealed class Donation : StreamHelper.Storage.ISeenItem, StreamHelper.Storage.ISelectable
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+
     private bool _seen;
     private bool _selected;
     private bool _done;

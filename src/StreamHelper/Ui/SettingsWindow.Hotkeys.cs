@@ -12,7 +12,7 @@ public partial class SettingsWindow
     private Key? _capturedKey;
 
     private TextBox[] HotkeyBoxes =>
-        new[] { HotkeyDonationsBox, HotkeyFollowersBox, HotkeySubscribersBox, HotkeyRewardsBox, HotkeyPingsBox, HotkeySettingsBox, HotkeyHideToastsBox, HotkeyChatBox, HotkeyChatToggleBox, HotkeyRewardSoundsBox };
+        new[] { HotkeyDonationsBox, HotkeyFollowersBox, HotkeySubscribersBox, HotkeyRewardsBox, HotkeyPingsBox, HotkeyMomentsBox, HotkeySettingsBox, HotkeyHideToastsBox, HotkeyChatBox, HotkeyChatToggleBox, HotkeyRewardSoundsBox };
 
     private void InitHotkeys(AppSettings settings)
     {

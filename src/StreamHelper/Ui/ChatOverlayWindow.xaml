@@ -34,6 +34,90 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+        <Style x:Key="CornerGrip" TargetType="Thumb">
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+
+            <EventSetter Event="DragDelta" Handler="OnGripDrag"/>
+            <EventSetter Event="DragCompleted" Handler="OnGripCompleted"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="#01000000">
+                            <Path x:Name="mark" Data="M 4,16 L 16,4 M 9,16 L 16,9 M 14,16 L 16,14" Stroke="{StaticResource AccentBrush}" StrokeThickness="2"
+                                  RenderTransformOrigin="0.5,0.5"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="TopLeft">
+                                <Setter TargetName="mark" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="-1" ScaleY="-1"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="Tag" Value="TopRight">
+                                <Setter TargetName="mark" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleY="-1"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="Tag" Value="BottomLeft">
+                                <Setter TargetName="mark" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="-1"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="VoteAction" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="#2E3440" BorderBrush="#454C5A" BorderThickness="1" CornerRadius="6" Padding="8,2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3A4150"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#474F60"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="VoteBar" TargetType="ProgressBar">
+            <Setter Property="Height" Value="5"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border x:Name="PART_Track" CornerRadius="2.5" Background="#33FFFFFF"/>
+                            <Border x:Name="PART_Indicator" CornerRadius="2.5" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border x:Name="Panel" CornerRadius="10" BorderThickness="2" BorderBrush="Transparent" ClipToBounds="True">
@@ -41,21 +125,90 @@
             <SolidColorBrush x:Name="PanelBrush" Color="#101217" Opacity="0.6"/>
         </Border.Background>
         <Grid>
-            <Grid x:Name="Viewport" Margin="10,6,10,6" ClipToBounds="True">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <ItemsControl x:Name="VoteCards" Grid.Row="0" Margin="8,6,8,0" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#EE181B22" BorderBrush="#4C9AFF" BorderThickness="1" CornerRadius="8" Padding="10,6,10,8" Margin="0,0,0,4">
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="#9AA3B2" FontSize="12" Margin="8,1,0,0"/>
+                                    <TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="13" Foreground="#E6E8EE" TextWrapping="Wrap"/>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,5,0,0" Opacity="{Binding RowOpacity}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <DockPanel>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding Detail}" Foreground="#9AA3B2" FontSize="12" Margin="8,0,0,0"/>
+                                                        <TextBlock Text="{Binding Label}" FontWeight="{Binding Weight}" FontSize="13" Foreground="#E6E8EE"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                    </DockPanel>
+                                                    <ProgressBar Style="{StaticResource VoteBar}" Value="{Binding Percent, Mode=OneWay}" Foreground="{Binding BarBrush}" Margin="0,3,0,0"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Style="{StaticResource VoteAction}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                        Content="{Binding WinText}" AutomationProperties.Name="{Binding WinName}"
+                                                        Visibility="{Binding ShowWin, Converter={StaticResource BoolVis}}" Click="OnVoteWin"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Error}" Foreground="#FF5C5C" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Visibility="{Binding HasError, Converter={StaticResource BoolVis}}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0" IsEnabled="{Binding NotBusy}"
+                                            Visibility="{Binding ShowButtons, Converter={StaticResource BoolVis}}">
+                                    <Button Style="{StaticResource VoteAction}" Content="Завершить" AutomationProperties.Name="Завершить опрос"
+                                            Visibility="{Binding ShowEnd, Converter={StaticResource BoolVis}}" Click="OnVoteEnd"/>
+                                    <Button Style="{StaticResource VoteAction}" Content="Закрыть ставки" AutomationProperties.Name="Закрыть ставки"
+                                            Visibility="{Binding ShowLock, Converter={StaticResource BoolVis}}" Click="OnVoteLock"/>
+                                    <Button Style="{StaticResource VoteAction}" Content="{Binding CancelText}" AutomationProperties.Name="{Binding CancelText}"
+                                            Visibility="{Binding ShowCancel, Converter={StaticResource BoolVis}}" Click="OnVoteCancel"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid x:Name="Viewport" Grid.Row="1" Margin="10,6,10,6" ClipToBounds="True">
                 <StackPanel x:Name="Lines" VerticalAlignment="Bottom"/>
             </Grid>
-            <TextBlock x:Name="PositionLabel" Text="Положение и размер чата" Foreground="{StaticResource MutedBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
-            <Thumb x:Name="Grip" Width="20" Height="20" HorizontalAlignment="Right" VerticalAlignment="Bottom" Cursor="SizeNWSE"
-                   Visibility="Collapsed" DragDelta="OnGripDrag" DragCompleted="OnGripCompleted">
+            <Thumb x:Name="ScrollThumb" Grid.Row="1" Width="5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,2,0"
+                   Visibility="Collapsed" Cursor="Hand" AutomationProperties.Name="Прокрутка чата"
+                   DragDelta="OnScrollThumbDrag">
                 <Thumb.Template>
                     <ControlTemplate TargetType="Thumb">
-                        <Border Background="Transparent">
-                            <Path Data="M 4,16 L 16,4 M 9,16 L 16,9 M 14,16 L 16,14" Stroke="{StaticResource AccentBrush}" StrokeThickness="2"/>
-                        </Border>
+                        <Border x:Name="bar" Background="{StaticResource AccentBrush}" CornerRadius="2.5" Opacity="0.7"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bar" Property="Opacity" Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Thumb.Template>
             </Thumb>
+            <Border x:Name="PausedStrip" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10"
+                    Background="#EE181B22" BorderBrush="#4C9AFF" BorderThickness="1" CornerRadius="10" Padding="10,2"
+                    IsHitTestVisible="False" Visibility="Collapsed">
+                <TextBlock x:Name="PausedText" FontSize="12" Foreground="#E6E8EE"/>
+            </Border>
+            <TextBlock x:Name="PositionLabel" Grid.RowSpan="2" Text="Положение и размер чата" Foreground="{StaticResource MutedBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+            <Thumb x:Name="GripTopLeft" Tag="TopLeft" Grid.RowSpan="2" Style="{StaticResource CornerGrip}" HorizontalAlignment="Left" VerticalAlignment="Top"
+                   Cursor="SizeNWSE" AutomationProperties.Name="Растянуть за левый верхний угол"/>
+            <Thumb x:Name="GripTopRight" Tag="TopRight" Grid.RowSpan="2" Style="{StaticResource CornerGrip}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                   Cursor="SizeNESW" AutomationProperties.Name="Растянуть за правый верхний угол"/>
+            <Thumb x:Name="GripBottomLeft" Tag="BottomLeft" Grid.RowSpan="2" Style="{StaticResource CornerGrip}" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                   Cursor="SizeNESW" AutomationProperties.Name="Растянуть за левый нижний угол"/>
+            <Thumb x:Name="GripBottomRight" Tag="BottomRight" Grid.RowSpan="2" Style="{StaticResource CornerGrip}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                   Cursor="SizeNWSE" AutomationProperties.Name="Растянуть за правый нижний угол"/>
         </Grid>
     </Border>
 </Window>

@@ -37,6 +37,7 @@ public partial class ChatOverlayWindow : Window
     private static readonly Brush ActionsLine = Frozen(new SolidColorBrush(Color.FromRgb(0x3A, 0x3F, 0x4B)));
     private static readonly Brush DoneBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x20)));
     private static readonly Brush ErrorBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x5C, 0x5C)));
+    private static readonly Brush ShoutBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xB9, 0x8C, 0xFF)));
 
     private readonly SolidColorBrush _cellBack = new(Color.FromRgb(0xC3, 0xC3, 0xC3));
     private readonly SolidColorBrush _cellLine = new(Colors.Black);
@@ -53,6 +54,8 @@ public partial class ChatOverlayWindow : Window
     private readonly DispatcherTimer _idle = new() { Interval = IdleExit };
 
     private readonly DispatcherTimer _front = new() { Interval = TimeSpan.FromSeconds(3) };
+    private ShoutoutLimits _shoutouts = new();
+    private bool _shouting;
     private bool _draining;
     private bool _menuOpen;
     private double _actionsGutter;
@@ -60,8 +63,9 @@ public partial class ChatOverlayWindow : Window
     private bool _positioning;
     private bool _interactive;
     private bool _fadingOut;
+    private double _scroll;
 
-    public ChatOverlayWindow(SettingsStore settings, ChatBadgeCatalog badges, IModerationApi moderation, ChatEmotes emotes)
+    public ChatOverlayWindow(SettingsStore settings, ChatBadgeCatalog badges, IModerationApi moderation, ChatEmotes emotes, IVoteApi votes, VoteWatcher watcher)
     {
         InitializeComponent();
         _settings = settings;
@@ -82,6 +86,10 @@ public partial class ChatOverlayWindow : Window
         _idle.Tick += (_, _) => SetInteractive(false);
         PreviewMouseMove += (_, _) => RestartIdle();
         PreviewMouseDown += (_, _) => RestartIdle();
+        PreviewMouseWheel += OnChatWheel;
+        Lines.SizeChanged += (_, _) => SetScroll(_scroll);
+        Viewport.SizeChanged += (_, _) => SetScroll(_scroll);
+        InitVotes(votes, watcher);
         ApplyAppearance();
         MoveToConfiguredPlace();
     }
@@ -150,7 +158,7 @@ public partial class ChatOverlayWindow : Window
         _positioning = on;
         ApplyAppearance();
         PositionLabel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
-        Grip.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var grip in new[] { GripTopLeft, GripTopRight, GripBottomLeft, GripBottomRight }) grip.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         UpdateFrame();
         UpdateInputMode();
     }
@@ -161,6 +169,8 @@ public partial class ChatOverlayWindow : Window
         _interactive = on;
         UpdateFrame();
         UpdateInputMode();
+        SetVotesInteractive(on);
+        UpdatePausedStrip();
         if (on)
         {
             foreach (var line in _lines)
@@ -168,6 +178,7 @@ public partial class ChatOverlayWindow : Window
                 if (line.Actions != null) line.Text.Margin = new Thickness(0, 0, ActionsGutter(line.Actions), 0);
             }
             _idle.Start();
+            SetScroll(0);
             return;
         }
 
@@ -178,7 +189,37 @@ public partial class ChatOverlayWindow : Window
             line.Text.Margin = new Thickness(0);
             Disarm(line);
         }
+        SetScroll(0);
         _ = DrainAsync();
+    }
+
+    private void OnChatWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!_interactive) return;
+        e.Handled = true;
+        RestartIdle();
+        SetScroll(_scroll + e.Delta / 120.0 * ChatPlacement.ClampFontSize(_settings.Current.ChatFontSize) * 3.5);
+    }
+
+    private void OnScrollThumbDrag(object sender, DragDeltaEventArgs e)
+    {
+        RestartIdle();
+        SetScroll(ChatPlacement.ScrollAfterThumbDrag(_scroll, e.VerticalChange, Lines.ActualHeight, Viewport.ActualHeight));
+    }
+
+    private void SetScroll(double value)
+    {
+        _scroll = _interactive ? ChatPlacement.ClampScroll(value, Lines.ActualHeight, Viewport.ActualHeight) : 0;
+        if (Math.Abs(Lines.Margin.Bottom + _scroll) > 0.1) Lines.Margin = new Thickness(0, 0, 0, -_scroll);
+        var thumb = _interactive ? ChatPlacement.ScrollThumb(Lines.ActualHeight, Viewport.ActualHeight, _scroll) : null;
+        if (thumb is not { } t)
+        {
+            ScrollThumb.Visibility = Visibility.Collapsed;
+            return;
+        }
+        ScrollThumb.Height = t.Height;
+        ScrollThumb.Margin = new Thickness(0, Viewport.Margin.Top + t.Top, 2, 0);
+        ScrollThumb.Visibility = Visibility.Visible;
     }
 
     private void KeepInFront()
@@ -272,6 +313,7 @@ public partial class ChatOverlayWindow : Window
             if (!_shown.Add(message.MessageId)) return;
         }
         _pending.Enqueue(message);
+        UpdatePausedStrip();
         if (!_draining) _ = DrainAsync();
     }
 
@@ -296,7 +338,15 @@ public partial class ChatOverlayWindow : Window
         finally
         {
             _draining = false;
+            UpdatePausedStrip();
         }
+    }
+
+    private void UpdatePausedStrip()
+    {
+        var waiting = _interactive ? _pending.Count : 0;
+        PausedStrip.Visibility = waiting > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (waiting > 0) PausedText.Text = ChatPlacement.PausedText(waiting);
     }
 
     private void Render(ChatMessage message)
@@ -351,12 +401,17 @@ public partial class ChatOverlayWindow : Window
             Placement = PlacementMode.MousePoint,
         };
 
+        var nick = new MenuItem { Header = ChatRules.MenuText(NameOf(line.Message)), IsEnabled = false, FontWeight = FontWeights.Bold };
+        System.Windows.Automation.AutomationProperties.SetName(nick, NameOf(line.Message));
+        menu.Items.Add(nick);
+
         var history = new MenuItem { Header = "История" };
         System.Windows.Automation.AutomationProperties.SetName(history, "История");
         history.Click += (_, _) => HistoryRequested?.Invoke(line.Message);
         menu.Opened += (_, _) => _menuOpen = true;
         menu.Closed += (_, _) => _menuOpen = false;
         menu.Items.Add(history);
+        if (CanModerate(line.Message)) menu.Items.Add(ShoutoutItem(menu, line));
 
         var label = new MenuItem { Header = "Подсветить", IsEnabled = false };
         System.Windows.Automation.AutomationProperties.SetName(label, "Подсветить");
@@ -405,7 +460,88 @@ public partial class ChatOverlayWindow : Window
             remove.Click += (_, _) => SetHighlight(key, null);
             menu.Items.Add(remove);
         }
+        AddChannelItems(menu);
         menu.IsOpen = true;
+    }
+
+    private MenuItem ShoutoutItem(ContextMenu menu, ChatLine line)
+    {
+        if (!_settings.Current.HasShoutoutScope) return Item("Отметить (нужно переподключить Twitch)", false);
+        if (_shouting) return Item("Отметить (отправляю…)", false);
+        var wait = _shoutouts.Check(line.Message.ChatterId, DateTime.UtcNow);
+        var item = Item(ShoutoutLimits.MenuText(wait), wait.Allowed);
+        if (!wait.Allowed) return item;
+
+        item.StaysOpenOnClick = true;
+        var armed = false;
+        var timer = new DispatcherTimer { Interval = BanConfirmWindow };
+        void Rest()
+        {
+            timer.Stop();
+            armed = false;
+            item.Header = ChatRules.MenuText("Отметить");
+            item.ClearValue(ForegroundProperty);
+            System.Windows.Automation.AutomationProperties.SetName(item, "Отметить");
+        }
+        timer.Tick += (_, _) => Rest();
+        menu.Closed += (_, _) => timer.Stop();
+        item.Click += async (_, _) =>
+        {
+            if (!armed)
+            {
+                armed = true;
+                item.Header = ChatRules.MenuText("Точно?");
+                item.Foreground = DoneBrush;
+                System.Windows.Automation.AutomationProperties.SetName(item, "Точно? Отметить");
+                timer.Start();
+                return;
+            }
+            timer.Stop();
+            menu.IsOpen = false;
+            await ShoutoutAsync(line);
+        };
+        return item;
+    }
+
+    private async Task ShoutoutAsync(ChatLine line)
+    {
+        var chatter = line.Message.ChatterId;
+        if (_shouting) return;
+        var wait = _shoutouts.Check(chatter, DateTime.UtcNow);
+        if (!wait.Allowed)
+        {
+            ShowShout(line, ShoutoutLimits.MenuText(wait), ErrorBrush);
+            return;
+        }
+        _shouting = true;
+        ModerationResult result;
+        try
+        {
+            result = await _moderation.ShoutoutAsync(chatter, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Shoutout failed: " + ex.Message);
+            result = new ModerationResult(false, "Ошибка: " + ex.Message);
+        }
+        finally
+        {
+            _shouting = false;
+        }
+        if (result.Success)
+        {
+            _shoutouts.Sent(chatter, DateTime.UtcNow);
+            foreach (var shouted in LinesOf(chatter)) ShowShout(shouted, "отмечен", ShoutBrush);
+        }
+        else ShowShout(line, result.Message, ErrorBrush);
+        RestartIdle();
+    }
+
+    private static void ShowShout(ChatLine line, string text, Brush brush)
+    {
+        if (line.Shout != null) line.Text.Inlines.Remove(line.Shout);
+        line.Shout = new Run("  · " + text) { Foreground = brush, FontSize = line.Text.FontSize * 0.9 };
+        line.Text.Inlines.Add(line.Shout);
     }
 
     private static FrameworkElement PaletteIcon()
@@ -479,8 +615,18 @@ public partial class ChatOverlayWindow : Window
         }
         if (hex != null) SetHighlight(ChatFeed.KeyOf(line.Message), hex);
     }
-    private bool CanModerate(ChatMessage message) =>
-        message.ChatterId.Length > 0 && message.ChatterId != _settings.Current.TwitchUserId;
+    private bool CanModerate(ChatMessage message) => ChatRules.CanModerate(message, _settings.Current);
+
+    public void ResetChannel()
+    {
+        Lines.Children.Clear();
+        _lines.Clear();
+        _pending.Clear();
+        _shown.Clear();
+        _shoutouts = new ShoutoutLimits();
+        UpdatePausedStrip();
+        SetScroll(0);
+    }
 
     private const string MuteGlyph = "M2,6 H4.8 L8.6,2.8 V13.2 L4.8,10 H2 Z M11,5.8 L14.2,10.2 M14.2,5.8 L11,10.2";
     private const string ClockGlyph = "M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 M8,5 V8.2 L10.4,9.8";
@@ -585,6 +731,7 @@ public partial class ChatOverlayWindow : Window
         public IconButton? Ban { get; set; }
         public IconButton? Undo { get; set; }
         public Run? Status { get; set; }
+        public Run? Shout { get; set; }
         public DispatcherTimer? DisarmTimer { get; set; }
         public Armed Armed { get; set; }
     }
@@ -842,8 +989,12 @@ public partial class ChatOverlayWindow : Window
 
     private void OnGripDrag(object sender, DragDeltaEventArgs e)
     {
-        Width = Math.Max(ChatPlacement.MinWidth, Width + e.HorizontalChange);
-        Height = Math.Max(ChatPlacement.MinHeight, Height + e.VerticalChange);
+        if (sender is not Thumb { Tag: string corner }) return;
+        var (left, top, width, height) = ChatPlacement.Resize(corner, Left, Top, Width, Height, e.HorizontalChange, e.VerticalChange);
+        Left = left;
+        Top = top;
+        Width = width;
+        Height = height;
     }
 
     private void OnGripCompleted(object sender, DragCompletedEventArgs e) => GeometryChanged?.Invoke();

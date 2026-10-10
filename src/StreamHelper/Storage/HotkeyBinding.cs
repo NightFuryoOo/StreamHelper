@@ -15,6 +15,7 @@ public enum HotkeyAction
     ChatInteract,
     ChatToggle,
     RewardSoundsMute,
+    Moments,
 }
 
 public sealed class HotkeyBinding
@@ -42,6 +43,7 @@ public static class HotkeyActions
         HotkeyAction.ChatInteract => "Чат: управление мышью",
         HotkeyAction.ChatToggle => "Чат: показать / скрыть",
         HotkeyAction.RewardSoundsMute => "Звуки наград: выкл / вкл",
+        HotkeyAction.Moments => "Рейды и стрики",
         _ => action.ToString(),
     };
 
@@ -52,6 +54,7 @@ public static class HotkeyActions
         HotkeyAction.Subscribers => 2,
         HotkeyAction.Rewards => 3,
         HotkeyAction.Pings => 4,
+        HotkeyAction.Moments => 5,
         _ => -1,
     };
 }

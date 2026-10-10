@@ -22,7 +22,6 @@ public class MuteBadgeTests
         Assert.Equal(-1, HotkeyActions.TabIndex(HotkeyAction.RewardSoundsMute));
         Assert.Equal("Звуки наград: выкл / вкл", HotkeyActions.Title(HotkeyAction.RewardSoundsMute));
         Assert.False(new AppSettings().GetHotkey(HotkeyAction.RewardSoundsMute).IsSet);
-        Assert.Equal(HotkeyAction.RewardSoundsMute, HotkeyActions.All[^1]);
     }
 
     [Fact]

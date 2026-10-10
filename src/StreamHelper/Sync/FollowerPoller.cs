@@ -52,7 +52,7 @@ public sealed class FollowerPoller : PollingService
             settings.LastFollowerUserIds = result.LastUserIds.ToList();
             _settings.Save();
         }
-        SetStatus(SyncState.Ok, $"Подключено · {settings.TwitchLogin}");
+        SetStatus(SyncState.Ok, settings.ConnectedText);
         return true;
     }
 }

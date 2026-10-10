@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Collections.Generic;
 using System;
 using System.ComponentModel;
 using System.Globalization;
@@ -9,6 +11,9 @@ namespace StreamHelper.Models;
 
 public sealed class Follower : ISeenItem, ISelectable
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+
     private bool _seen;
     private bool _selected;
 
