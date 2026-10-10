@@ -41,6 +41,17 @@ public sealed class ChatFeed
         Message?.Invoke(message);
     }
 
+    public void Clear()
+    {
+        lock (_gate)
+        {
+            _recent.Clear();
+            _history.Clear();
+            _idOrder.Clear();
+            _ids.Clear();
+        }
+    }
+
     public IReadOnlyList<ChatMessage> Recent()
     {
         lock (_gate) return _recent.ToArray();
@@ -69,6 +80,7 @@ public sealed class ChatBadgeCatalog
     private IReadOnlyDictionary<string, string> _urls = new Dictionary<string, string>();
     private Task? _loading;
     private DateTime _nextTryUtc;
+    private int _generation;
 
     public ChatBadgeCatalog(IBadgeApi api) => _api = api;
 
@@ -117,12 +129,30 @@ public sealed class ChatBadgeCatalog
         }
     }
 
+    public void Reset()
+    {
+        lock (_gate)
+        {
+            _generation++;
+            _urls = new Dictionary<string, string>();
+            _loading = null;
+            _nextTryUtc = default;
+        }
+    }
+
     private async Task LoadAsync()
     {
+        int generation;
+        lock (_gate) generation = _generation;
         try
         {
-            _urls = await _api.GetBadgeImagesAsync(CancellationToken.None);
-            if (_urls.Count > 0) Loaded?.Invoke();
+            var urls = await _api.GetBadgeImagesAsync(CancellationToken.None);
+            lock (_gate)
+            {
+                if (generation != _generation) return;
+                _urls = urls;
+            }
+            if (urls.Count > 0) Loaded?.Invoke();
         }
         catch (Exception ex)
         {
@@ -130,7 +160,10 @@ public sealed class ChatBadgeCatalog
         }
         finally
         {
-            lock (_gate) _nextTryUtc = DateTime.UtcNow + RetryAfter;
+            lock (_gate)
+            {
+                if (generation == _generation) _nextTryUtc = DateTime.UtcNow + RetryAfter;
+            }
         }
     }
 }

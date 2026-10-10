@@ -60,10 +60,15 @@ internal sealed class FakeRewardApi : IRewardApi
 
     public List<(string RewardId, bool Enabled)> Switched { get; } = new();
 
+    public Func<string, bool, RewardToggleResult>? OnSwitch { get; set; }
+
     public Task<RewardToggleResult> SetRewardEnabledAsync(string rewardId, bool enabled, CancellationToken ct)
     {
         Switched.Add((rewardId, enabled));
-        return Task.FromResult(new RewardToggleResult(true, ""));
+        var result = OnSwitch?.Invoke(rewardId, enabled) ?? new RewardToggleResult(true, "");
+        var index = Rewards.FindIndex(r => r.Id == rewardId);
+        if (result.Success && index >= 0) Rewards[index] = Rewards[index] with { IsEnabled = enabled };
+        return Task.FromResult(result);
     }
 
     public List<(string RewardId, string Title)> Renamed { get; } = new();

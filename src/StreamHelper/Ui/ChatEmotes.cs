@@ -34,6 +34,8 @@ public sealed class ChatEmotes
 
     public Task EnsureCatalogAsync() => _seven.EnsureLoadedAsync();
 
+    public void ResetChannel() => _seven.Reset();
+
     public bool CatalogLoading => _seven.IsLoading;
 
     public sealed record Piece(string Text, string? Url);

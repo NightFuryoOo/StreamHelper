@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _services = services;
         UpdateBannerView.DataContext = services.Updates;
+        VersionBlock.DataContext = services.Updates;
 
         var settings = services.Settings.Current;
         InitHotkeys(settings);
@@ -31,6 +32,7 @@ public partial class SettingsWindow : Window
         ShowCredits(!settings.CreditsCollapsed);
         InitNotifyChecks(settings);
         InitPings(settings);
+        InitMuteRewards();
         InitRewardSounds();
         InitChat(settings);
         InitRewards(settings);
@@ -47,9 +49,10 @@ public partial class SettingsWindow : Window
         RefreshRewardAlert();
         Hook(() => services.RewardAlert.Failed += OnRewardAlertFailed, () => services.RewardAlert.Failed -= OnRewardAlertFailed);
         RefreshTwitchSummary();
+        _ = LoadModeratedChannelsAsync();
         Closed += (_, _) => OnClosedCleanup();
 
-        var section = settings.SettingsSection is >= 0 and <= 7 ? settings.SettingsSection : 0;
+        var section = settings.SettingsSection is >= 0 and <= 8 ? settings.SettingsSection : 0;
         if (!settings.HasAnyDonationSource && !settings.HasTwitchTokens) section = 1;
         if (TakeProfileNotice()) section = 0;
         _loading = false;
@@ -104,6 +107,7 @@ public partial class SettingsWindow : Window
         WatchStatus(_services.RewardListener, status => ShowStatus(RewardsStatusText, RewardsStatusDot, status));
         WatchStatus(_services.PingListener, status => ShowStatus(PingsStatusText, PingsStatusDot, status));
         WatchStatus(_services.PingListener, ApplyChatStatus);
+        WatchStatus(_services.PingListener, status => ShowStatus(MomentsStatusText, MomentsStatusDot, status with { Message = MainViewModel.MomentStatusText(status) }));
     }
 
     private static Brush Resource(string key) => (Brush)Application.Current.Resources[key];
@@ -147,10 +151,10 @@ public partial class SettingsWindow : Window
     private void Reveal(FrameworkElement element) =>
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => element.BringIntoView()));
 
-    private RadioButton[] SectionTabs => new[] { TabGeneral, TabDonations, TabTwitch, TabFollowers, TabSubscribers, TabRewards, TabPings, TabChat };
+    private RadioButton[] SectionTabs => new[] { TabGeneral, TabDonations, TabTwitch, TabFollowers, TabSubscribers, TabRewards, TabPings, TabChat, TabMoments };
 
     private FrameworkElement[] SectionPanels =>
-        new FrameworkElement[] { SectionGeneral, SectionDonations, SectionTwitch, SectionFollowers, SectionSubscribers, SectionRewards, SectionPings, SectionChat };
+        new FrameworkElement[] { SectionGeneral, SectionDonations, SectionTwitch, SectionFollowers, SectionSubscribers, SectionRewards, SectionPings, SectionChat, SectionMoments };
 
     private void SelectSection(int index)
     {
@@ -181,6 +185,8 @@ public partial class SettingsWindow : Window
         SubscribersCheck.IsChecked = settings.NotifySubscribers;
         RewardsCheck.IsChecked = settings.NotifyRewards;
         PingsCheck.IsChecked = settings.NotifyPings;
+        RaidsCheck.IsChecked = settings.NotifyRaids;
+        StreaksCheck.IsChecked = settings.NotifyStreaks;
     }
 
     private void OnOptionsChanged(object sender, RoutedEventArgs e)
@@ -192,6 +198,8 @@ public partial class SettingsWindow : Window
         settings.NotifySubscribers = SubscribersCheck.IsChecked == true;
         settings.NotifyRewards = RewardsCheck.IsChecked == true;
         settings.NotifyPings = PingsCheck.IsChecked == true;
+        settings.NotifyRaids = RaidsCheck.IsChecked == true;
+        settings.NotifyStreaks = StreaksCheck.IsChecked == true;
         _services.Settings.Save();
     }
 
@@ -204,6 +212,13 @@ public partial class SettingsWindow : Window
     private void OnAddTestRedemption(object sender, RoutedEventArgs e) => _services.AddTestRedemption();
 
     private void OnAddTestPing(object sender, RoutedEventArgs e) => _services.AddTestPing();
+
+    private void OnAddTestRaid(object sender, RoutedEventArgs e) => _services.AddTestRaid();
+
+    private void OnAddTestStreak(object sender, RoutedEventArgs e) => _services.AddTestStreak();
+
+
+    private void OnChooseVersion(object sender, RoutedEventArgs e) => new VersionWindow(_services.Updates) { Owner = this }.ShowDialog();
 
     private static void OpenInBrowser(string url) => BrowserLauncher.Open(url);
 

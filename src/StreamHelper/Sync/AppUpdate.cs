@@ -9,7 +9,11 @@ namespace StreamHelper.Sync;
 
 public sealed record UpdateAsset(string Name, string Url, long Size, string? Digest = null);
 
-public sealed record UpdateRelease(Version Version, string Tag, string Name, string Notes, string PageUrl, UpdateAsset? Exe, UpdateAsset? Checksum);
+public sealed record UpdateRelease(
+    Version Version, string Tag, string Name, string Notes, string PageUrl, UpdateAsset? Exe, UpdateAsset? Checksum, DateTime? PublishedUtc = null)
+{
+    public bool CanInstall => Exe != null && (Exe.Digest != null || Checksum != null);
+}
 
 public static class AppUpdate
 {
@@ -21,22 +25,60 @@ public static class AppUpdate
     public const long MaxExeBytes = 300L * 1024 * 1024;
     public const int MaxNotesLength = 1500;
 
+    public static readonly Version OldestChoosable = new(1, 0, 0, 1);
+
     public static string LatestUrl(string? apiBase) =>
         $"{(string.IsNullOrWhiteSpace(apiBase) ? DefaultApi : apiBase.Trim()).TrimEnd('/')}/repos/{Owner}/{Repository}/releases/latest";
 
     public static Version? ParseVersion(string? tag)
     {
         var text = (tag ?? "").Trim();
-        if (text.StartsWith("v", StringComparison.OrdinalIgnoreCase)) text = text[1..];
+        if (text.StartsWith("v", StringComparison.OrdinalIgnoreCase)) text = text[1..].TrimStart('.', '-', '_', ' ');
         return Version.TryParse(text, out var version) ? AppVersion.Normalize(version) : null;
     }
 
+    public static string ReleasesUrl(string? apiBase) =>
+        $"{(string.IsNullOrWhiteSpace(apiBase) ? DefaultApi : apiBase.Trim()).TrimEnd('/')}/repos/{Owner}/{Repository}/releases?per_page=100";
+
     public static bool IsNewer(UpdateRelease release, Version current) => release.Version > AppVersion.Normalize(current);
+
+    public static bool ShouldOffer(UpdateRelease release, Version current, string? skipped) =>
+        IsNewer(release, current) && (ParseVersion(skipped) is not { } skip || release.Version > skip);
+
+    public static string? SkipAfterChoosing(Version chosen, IEnumerable<UpdateRelease> known)
+    {
+        var newest = known.Select(r => r.Version).DefaultIfEmpty(chosen).Max()!;
+        return newest > AppVersion.Normalize(chosen) ? newest.ToString(4) : null;
+    }
+
+    public static IReadOnlyList<UpdateRelease> Choosable(IEnumerable<UpdateRelease> releases) =>
+        releases
+            .Where(r => r.Version >= OldestChoosable && r.CanInstall)
+            .GroupBy(r => r.Version)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.Version)
+            .ToList();
+
+    public static IReadOnlyList<UpdateRelease> ParseReleases(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var releases = new List<UpdateRelease>();
+        if (doc.RootElement.ValueKind != JsonValueKind.Array) return releases;
+        foreach (var element in doc.RootElement.EnumerateArray())
+        {
+            if (Read(element) is { } release) releases.Add(release);
+        }
+        return releases;
+    }
 
     public static UpdateRelease? ParseRelease(string json)
     {
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        return Read(doc.RootElement);
+    }
+
+    private static UpdateRelease? Read(JsonElement root)
+    {
         if (root.ValueKind != JsonValueKind.Object) return null;
         if (Flag(root, "draft") || Flag(root, "prerelease")) return null;
         var tag = Text(root, "tag_name");
@@ -54,9 +96,11 @@ public static class AppUpdate
             }
         }
 
+        DateTime? published = DateTime.TryParse(Text(root, "published_at"), System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at : null;
         return new UpdateRelease(
             version, tag, Text(root, "name"), CleanNotes(Text(root, "body")), Text(root, "html_url"),
-            Find(assets, ExeAsset), Find(assets, ChecksumAsset));
+            Find(assets, ExeAsset), Find(assets, ChecksumAsset), published);
     }
 
     public static string? ParseDigest(string digest)

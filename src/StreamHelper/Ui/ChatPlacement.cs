@@ -32,6 +32,41 @@ public static class ChatPlacement
         return $"{seconds} с";
     }
 
+    public static string PausedText(int waiting) => $"Чат на паузе · новых: {waiting}";
+
+    public const double MinScrollThumb = 24;
+
+    public static double MaxScroll(double content, double view) => Math.Max(0, content - view);
+
+    public static double ClampScroll(double value, double content, double view) =>
+        double.IsNaN(value) ? 0 : Math.Clamp(value, 0, MaxScroll(content, view));
+
+    public static (double Top, double Height)? ScrollThumb(double content, double view, double scroll)
+    {
+        var max = MaxScroll(content, view);
+        if (max <= 0.5 || view <= 0) return null;
+        var height = Math.Min(view, Math.Max(MinScrollThumb, view * view / content));
+        var top = (view - height) * (1 - ClampScroll(scroll, content, view) / max);
+        return (top, height);
+    }
+
+    public static double ScrollAfterThumbDrag(double scroll, double dy, double content, double view)
+    {
+        var thumb = ScrollThumb(content, view, scroll);
+        if (thumb is not { } t || view - t.Height <= 0) return scroll;
+        return ClampScroll(scroll - dy * MaxScroll(content, view) / (view - t.Height), content, view);
+    }
+
+    public static (double Left, double Top, double Width, double Height) Resize(
+        string corner, double left, double top, double width, double height, double dx, double dy)
+    {
+        var fromLeft = corner.Contains("Left", StringComparison.Ordinal);
+        var fromTop = corner.Contains("Top", StringComparison.Ordinal);
+        var newWidth = Math.Max(MinWidth, fromLeft ? width - dx : width + dx);
+        var newHeight = Math.Max(MinHeight, fromTop ? height - dy : height + dy);
+        return (fromLeft ? left + width - newWidth : left, fromTop ? top + height - newHeight : top, newWidth, newHeight);
+    }
+
     public static double ClampOpacity(double value) => double.IsNaN(value) ? DefaultOpacity : Math.Clamp(value, MinOpacity, 1.0);
 
     public static double ClampCellOpacity(double value) => double.IsNaN(value) ? DefaultCellOpacity : Math.Clamp(value, 0.0, 1.0);

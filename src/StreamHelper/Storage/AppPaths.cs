@@ -17,6 +17,7 @@ internal static class AppPaths
     public static string SubscribersFile => Path.Combine(Directory, "subscribers.json");
     public static string RedemptionsFile => Path.Combine(Directory, "redemptions.json");
     public static string PingsFile => Path.Combine(Directory, "pings.json");
+    public static string MomentsFile => Path.Combine(Directory, "raids.json");
     public static string LogFile => Path.Combine(Directory, "log.txt");
     public static string AlertsFolder => Path.Combine(Directory, "alerts");
 

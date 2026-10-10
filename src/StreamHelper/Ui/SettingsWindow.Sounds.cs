@@ -173,6 +173,7 @@ public partial class SettingsWindow
         var result = _services.RewardAlert.Choose(_soundPicked.Id, dialog.FileName);
         ShowLine(RewardAlertStatus, result.Success ? "" : result.Error);
         RefreshRewardAlert();
+        _ = _services.RewardMute.SyncAsync();
     }
 
     private void OnRewardAlertClear(object sender, RoutedEventArgs e)
@@ -184,6 +185,7 @@ public partial class SettingsWindow
         _services.Settings.Save();
         ShowLine(RewardAlertStatus, "");
         RebuildSoundLists(null);
+        _ = _services.RewardMute.SyncAsync();
     }
 
     private void OnRewardAlertTest(object sender, RoutedEventArgs e)

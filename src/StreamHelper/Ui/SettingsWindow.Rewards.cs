@@ -227,6 +227,7 @@ public partial class SettingsWindow
                 return;
             }
             reward.Enabled = enable;
+            _services.RewardMute.ForgetManual(reward.Id);
             var index = _allRewards.FindIndex(r => r.Id == reward.Id);
             if (index >= 0) _allRewards[index] = _allRewards[index] with { IsEnabled = enable };
             if (_managedInfos.TryGetValue(reward.Id, out var info)) _managedInfos[reward.Id] = info with { IsEnabled = enable };

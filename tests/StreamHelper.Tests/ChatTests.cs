@@ -256,6 +256,47 @@ public class ChatPlacementTests
     private static readonly ScreenBounds Work = new(0, 0, 1920, 1040);
     private static readonly ScreenBounds Virtual = new(0, 0, 1920, 1080);
 
+    [Theory]
+    [InlineData("BottomRight", 30, 20, 100, 200, 430, 320)]
+    [InlineData("TopLeft", -30, -20, 70, 180, 430, 320)]
+    [InlineData("TopRight", 30, -20, 100, 180, 430, 320)]
+    [InlineData("BottomLeft", -30, 20, 70, 200, 430, 320)]
+    public void Every_corner_resizes_and_keeps_the_opposite_corner_in_place(string corner, double dx, double dy, double left, double top, double width, double height)
+    {
+        Assert.Equal((left, top, width, height), ChatPlacement.Resize(corner, 100, 200, 400, 300, dx, dy));
+    }
+
+    [Theory]
+    [InlineData("TopLeft")]
+    [InlineData("BottomRight")]
+    public void A_corner_cannot_shrink_the_chat_below_its_minimum(string corner)
+    {
+        var shrink = corner == "TopLeft" ? 1000 : -1000;
+
+        var (left, top, width, height) = ChatPlacement.Resize(corner, 100, 200, 400, 300, shrink, shrink);
+
+        Assert.Equal(ChatPlacement.MinWidth, width);
+        Assert.Equal(ChatPlacement.MinHeight, height);
+        if (corner == "TopLeft")
+        {
+            Assert.Equal(500, left + width);
+            Assert.Equal(500, top + height);
+        }
+        else
+        {
+            Assert.Equal(100, left);
+            Assert.Equal(200, top);
+        }
+    }
+
+    [Theory]
+    [InlineData(1, "Чат на паузе · новых: 1")]
+    [InlineData(25, "Чат на паузе · новых: 25")]
+    public void The_paused_strip_counts_waiting_messages(int waiting, string expected)
+    {
+        Assert.Equal(expected, ChatPlacement.PausedText(waiting));
+    }
+
     [Fact]
     public void Without_a_saved_place_the_chat_sits_in_the_bottom_left_corner()
     {

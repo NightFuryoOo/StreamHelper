@@ -11,7 +11,7 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Sync;
 
-public sealed record EventSubFeature(string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage);
+public sealed record EventSubFeature(string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage, bool FollowsChannel = false);
 
 public abstract class EventSubListener<T> : ISyncWorker where T : class
 {
@@ -146,6 +146,11 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         {
             return new SyncStatus(SyncState.NeedsLogin, _feature.MissingScopeMessage);
         }
+        if (!_feature.FollowsChannel && !settings.IsOwnChannel)
+        {
+            return new SyncStatus(SyncState.NotConnected,
+                $"{_feature.Label}: только на своём канале. Сейчас выбран канал {settings.ChannelLabel} (вкладка «Twitch»).");
+        }
         return null;
     }
 
@@ -178,7 +183,8 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
                             }
                             subscribed = true;
                             _failures = 0;
-                            SetStatus(SyncState.Ok, $"Подключено · {_settings.Current.TwitchLogin}");
+                            var now = _settings.Current;
+                            SetStatus(SyncState.Ok, _feature.FollowsChannel ? now.ConnectedText : $"Подключено · {now.TwitchLogin}");
                         }
                         break;
 

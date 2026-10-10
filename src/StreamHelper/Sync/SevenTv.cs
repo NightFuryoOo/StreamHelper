@@ -121,6 +121,7 @@ public sealed class SevenTvCatalog
     private Task? _loading;
     private DateTime _nextTryUtc;
     private DateTime _renewUtc;
+    private int _generation;
 
     public SevenTvCatalog(ISevenTvApi api, Func<string> channelId)
     {
@@ -152,8 +153,22 @@ public sealed class SevenTvCatalog
         }
     }
 
+    public void Reset()
+    {
+        lock (_gate)
+        {
+            _generation++;
+            _byName = new Dictionary<string, SevenTvEmote>();
+            _loading = null;
+            _nextTryUtc = default;
+            _renewUtc = default;
+        }
+    }
+
     private async Task LoadAsync()
     {
+        int generation;
+        lock (_gate) generation = _generation;
         var map = new Dictionary<string, SevenTvEmote>(StringComparer.Ordinal);
         var failed = false;
         try
@@ -179,6 +194,7 @@ public sealed class SevenTvCatalog
 
         lock (_gate)
         {
+            if (generation != _generation) return;
             if (map.Count > 0 && (!failed || map.Count >= _byName.Count)) _byName = map;
             _nextTryUtc = DateTime.UtcNow + RetryAfter;
             _renewUtc = DateTime.UtcNow + (failed ? RetryAfter : RenewAfter);

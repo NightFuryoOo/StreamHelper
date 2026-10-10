@@ -15,8 +15,12 @@ public sealed class ChecksumMismatchException : Exception
     }
 }
 
+public sealed record UpdateMarker(string Version, bool Chosen);
+
 public static class UpdateInstaller
 {
+    private const string ChosenWord = "chosen";
+
     private const string MarkerFile = "update-done.txt";
 
     public static string NewPath(string exe) => exe + ".new";
@@ -108,18 +112,19 @@ public static class UpdateInstaller
         Log.Write("Removing the previous version's file failed: " + OldPath(exe));
     }
 
-    public static void WriteMarker(string dataDirectory, string version) =>
-        File.WriteAllText(Path.Combine(dataDirectory, MarkerFile), version);
+    public static void WriteMarker(string dataDirectory, string version, bool chosen = false) =>
+        File.WriteAllText(Path.Combine(dataDirectory, MarkerFile), chosen ? version + " " + ChosenWord : version);
 
-    public static string? TakeMarker(string dataDirectory)
+    public static UpdateMarker? TakeMarker(string dataDirectory)
     {
         var path = Path.Combine(dataDirectory, MarkerFile);
         try
         {
             if (!File.Exists(path)) return null;
-            var version = File.ReadAllText(path).Trim();
+            var words = File.ReadAllText(path).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             File.Delete(path);
-            return version;
+            if (words.Length == 0) return null;
+            return new UpdateMarker(words[0], words.Length > 1 && words[1] == ChosenWord);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

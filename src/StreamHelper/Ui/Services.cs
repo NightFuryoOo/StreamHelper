@@ -18,6 +18,7 @@ public sealed class Services
     public required SubscriberStore Subscribers { get; init; }
     public required RedemptionStore Redemptions { get; init; }
     public required PingStore Pings { get; init; }
+    public required MomentStore Moments { get; init; }
     public required DonationAlertsClient Client { get; init; }
     public required TwitchClient Twitch { get; init; }
     public required HotkeyService Hotkey { get; init; }
@@ -28,6 +29,8 @@ public sealed class Services
     public required MuteBadgeService MuteBadge { get; init; }
     public required MainViewModel ViewModel { get; init; }
     public required UpdateService Updates { get; init; }
+    public required VoteWatcher Votes { get; init; }
+    public required RewardMuteSwitch RewardMute { get; init; }
 
     public DonationPoller Poller { get; set; } = null!;
     public DonatePayPoller DonatePayPoller { get; set; } = null!;
@@ -40,12 +43,13 @@ public sealed class Services
     public MainWindow Overlay { get; set; } = null!;
 
     public IReadOnlyList<ISyncWorker> Workers =>
-        new ISyncWorker[] { Poller, DonatePayPoller, DonateXPoller, FollowerPoller, SubscriptionListener, RewardListener, PingListener };
+        new ISyncWorker[] { Poller, DonatePayPoller, DonateXPoller, FollowerPoller, SubscriptionListener, RewardListener, PingListener, Votes };
     public Action<IReadOnlyList<Donation>> HandleDonations { get; set; } = _ => { };
     public Action<IReadOnlyList<Follower>> HandleFollowers { get; set; } = _ => { };
     public Action<IReadOnlyList<Subscriber>> HandleSubscribers { get; set; } = _ => { };
     public Action<IReadOnlyList<Redemption>> HandleRedemptions { get; set; } = _ => { };
     public Action<IReadOnlyList<ChatPing>> HandlePings { get; set; } = _ => { };
+    public Action<IReadOnlyList<ChannelMoment>> HandleMoments { get; set; } = _ => { };
     public Func<bool> RestartApp { get; set; } = () => false;
     public ProfileNotice? ProfileNotice { get; set; }
 
@@ -126,6 +130,7 @@ public sealed class Services
             var ids = await Twitch.GetManageableRewardIdsAsync(System.Threading.CancellationToken.None);
             settings.ManagedRewardIds = new List<string>(ids);
             Settings.Save();
+            _ = RewardMute.SyncAsync();
         }
         catch (Exception ex)
         {
@@ -159,6 +164,49 @@ public sealed class Services
         });
     }
 
+    private static readonly (string Login, string Name, int Viewers)[] TestRaiders =
+    {
+        ("big_streamer", "Big_Streamer", 128),
+        ("anna_k", "Anna_K", 1),
+        ("mark", "Mark", 23),
+    };
+
+    public void AddTestRaid()
+    {
+        var sample = TestRaiders[Random.Shared.Next(TestRaiders.Length)];
+        var stamp = DateTime.UtcNow;
+        HandleMoments(new[]
+        {
+            new ChannelMoment
+            {
+                Key = "test-" + stamp.Ticks, Kind = MomentKind.Raid, Login = sample.Login, DisplayName = sample.Name,
+                Viewers = sample.Viewers, AtUtc = stamp,
+            },
+        });
+    }
+
+    private static readonly (string Login, string Name, int Count, string Text)[] TestStreaks =
+    {
+        ("test_viewer", "Test_Viewer", 3, ""),
+        ("anna_k", "Anna_K", 5, "Пятый стрим подряд!"),
+        ("mark", "Mark", 12, "Не пропускаю ни одного"),
+    };
+
+    public void AddTestStreak()
+    {
+        var sample = TestStreaks[Random.Shared.Next(TestStreaks.Length)];
+        var stamp = DateTime.UtcNow;
+        HandleMoments(new[]
+        {
+            new ChannelMoment
+            {
+                Key = "test-" + stamp.Ticks, Kind = MomentKind.Streak, Login = sample.Login, DisplayName = sample.Name,
+                StreakCount = sample.Count, ChannelPoints = 350 + sample.Count * 20,
+                Message = sample.Text.Length == 0 ? "" : "[тест] " + sample.Text, AtUtc = stamp,
+            },
+        });
+    }
+
     public void AddTestSubscriber()
     {
         var stamp = DateTime.UtcNow;
@@ -174,6 +222,30 @@ public sealed class Services
             _ => new Subscriber { Key = key, Kind = SubscriptionKind.Gift, IsAnonymous = true, Tier = "1000", GiftTotal = 5, AtUtc = stamp },
         };
         HandleSubscribers(new[] { subscriber });
+    }
+
+    public void RestartTwitchSync()
+    {
+        FollowerPoller.PollSoon();
+        SubscriptionListener.Restart();
+        RewardListener.Restart();
+        PingListener.Restart();
+        Votes.PollSoon();
+        _ = RewardMute.SyncAsync();
+    }
+
+    public bool ChangeChannel(ModeratedChannel? channel)
+    {
+        var settings = Settings.Current;
+        if (!settings.SelectChannel(channel?.Id ?? "", channel?.Login ?? "", channel?.Name ?? ""))
+        {
+            Settings.Save();
+            return false;
+        }
+        Settings.Save();
+        Chat.ResetChannel();
+        RestartTwitchSync();
+        return true;
     }
 
     public void ToggleSettings()

@@ -21,6 +21,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         new(SyncState.NotConnected, "Не подключено"),
         new(SyncState.NotConnected, "Не подключено"),
         new(SyncState.NotConnected, "Не подключено"),
+        new(SyncState.NotConnected, "Не подключено"),
     };
     private int _selectedTab;
     private string _undoText = "";
@@ -33,25 +34,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel(
         DonationStore donations, FollowerStore followers, SubscriberStore subscribers, RedemptionStore redemptions,
-        PingStore pings, int selectedTab)
+        PingStore pings, MomentStore moments, int selectedTab)
     {
         Donations = donations;
         Followers = followers;
         Subscribers = subscribers;
         Redemptions = redemptions;
         Pings = pings;
-        _selectedTab = selectedTab is >= 0 and <= 4 ? selectedTab : 0;
+        Moments = moments;
+        _selectedTab = selectedTab is >= 0 and <= 5 ? selectedTab : 0;
         _undoTimer.Tick += (_, _) => ClearUndo();
         donations.PropertyChanged += OnUnseenChanged;
         followers.PropertyChanged += OnUnseenChanged;
         subscribers.PropertyChanged += OnUnseenChanged;
         redemptions.PropertyChanged += OnUnseenChanged;
         pings.PropertyChanged += OnUnseenChanged;
+        moments.PropertyChanged += OnUnseenChanged;
 
         PingSelection = new SelectionTracker<ChatPing>(pings.Items);
         FollowerSelection = new SelectionTracker<Follower>(followers.Items);
         SubscriberSelection = new SelectionTracker<Subscriber>(subscribers.Items);
         DonationSelection = new SelectionTracker<Donation>(donations.Items);
+        MomentSelection = new SelectionTracker<ChannelMoment>(moments.Items);
         RewardSelection = new SelectionTracker<Redemption>(redemptions.Items);
         RewardSelection.PropertyChanged += OnRewardSelectionChanged;
         _rewardConfirmTimer.Tick += (_, _) => CancelRewardsRejectConfirm();
@@ -62,9 +66,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public SubscriberStore Subscribers { get; }
     public RedemptionStore Redemptions { get; }
     public PingStore Pings { get; }
+    public MomentStore Moments { get; }
 
     public int TotalUnseen =>
-        Donations.UnseenCount + Followers.UnseenCount + Subscribers.UnseenCount + Redemptions.UnseenCount + Pings.UnseenCount;
+        Donations.UnseenCount + Followers.UnseenCount + Subscribers.UnseenCount + Redemptions.UnseenCount + Pings.UnseenCount +
+        Moments.UnseenCount;
 
     public int SelectedTab
     {
@@ -79,6 +85,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Raise(nameof(IsSubscribersTab));
             Raise(nameof(IsRewardsTab));
             Raise(nameof(IsPingsTab));
+            Raise(nameof(IsMomentsTab));
             Raise(nameof(StatusText));
         }
     }
@@ -128,6 +135,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IsMomentsTab
+    {
+        get => _selectedTab == 5;
+        set
+        {
+            if (value) SelectedTab = 5;
+        }
+    }
+
 
     public string StatusText => _statuses[_selectedTab].Message;
 
@@ -141,10 +157,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string PingsEmptyText => EmptyText(_statuses[4], "Сообщения, где тебя упомянули (@ник), появятся здесь.\nСобытия приходят только пока приложение запущено.");
 
+    public string MomentsEmptyText => EmptyText(_statuses[5], "Рейды на твой канал и стрики зрителей появятся здесь.\nСобытия приходят только пока приложение запущено.");
+
     public SelectionTracker<ChatPing> PingSelection { get; }
     public SelectionTracker<Follower> FollowerSelection { get; }
     public SelectionTracker<Subscriber> SubscriberSelection { get; }
     public SelectionTracker<Donation> DonationSelection { get; }
+    public SelectionTracker<ChannelMoment> MomentSelection { get; }
     public SelectionTracker<Redemption> RewardSelection { get; }
 
     public bool RewardsIdle => !_rewardsBusy;
@@ -208,6 +227,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void ApplyPingStatus(SyncStatus status) => Apply(4, status, nameof(PingsEmptyText));
 
+    public void ApplyMomentStatus(SyncStatus status) => Apply(5, status with { Message = MomentStatusText(status) }, nameof(MomentsEmptyText));
+
+    public static string MomentStatusText(SyncStatus status) =>
+        status.Message.StartsWith("Пинги", StringComparison.Ordinal) ? "Рейды и стрики" + status.Message["Пинги".Length..] : status.Message;
+
     public void ShowUndo(string text, Action restore)
     {
         _undoAction = restore;
@@ -236,6 +260,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void DeleteSelectedSubscribers() =>
         DeleteSelected(Subscribers, SubscriberSelection, subscriber => $"Удалено: {subscriber.Name} ({subscriber.KindText})", "Удалено подписок");
+
+    public void DeleteSelectedMoments() =>
+        DeleteSelected(Moments, MomentSelection, moment => $"Удалено: {moment.Name} ({moment.KindText})", "Удалено записей");
 
     public void DeleteSelectedDonations() =>
         DeleteSelected(Donations, DonationSelection, donation => $"Удалено: {donation.DisplayName} · {donation.AmountText}", "Удалено донатов");

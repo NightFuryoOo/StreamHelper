@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using StreamHelper.Models;
+using StreamHelper.Storage;
 
 namespace StreamHelper.Ui;
 
@@ -37,5 +39,23 @@ public static class EventToasts
     {
         var newest = added[^1];
         return new ToastText(added.Count == 1 ? "Тебя упомянули в чате" : $"Упоминаний в чате: {added.Count}", newest.Name, newest.Message);
+    }
+
+    public static bool Notifies(AppSettings settings, ChannelMoment moment) =>
+        moment.IsRaid ? settings.NotifyRaids : settings.NotifyStreaks;
+
+    public static ToastText Moments(IReadOnlyList<ChannelMoment> added)
+    {
+        var newest = added[^1];
+        var raids = added.Count(m => m.IsRaid);
+        var title = added.Count == 1
+            ? newest.IsRaid ? "Рейд на канал" : "Серия просмотров"
+            : raids == added.Count ? $"Рейдов: {raids}"
+            : raids == 0 ? $"Стриков: {added.Count}"
+            : $"Рейдов и стриков: {added.Count}";
+        var line = newest.IsRaid
+            ? $"{newest.Name} · {newest.Detail}"
+            : $"{newest.Name} · {newest.StreakCount} {Words.Plural(newest.StreakCount, "стрим", "стрима", "стримов")} подряд";
+        return new ToastText(title, line, newest.HasMessage ? newest.Message : null);
     }
 }

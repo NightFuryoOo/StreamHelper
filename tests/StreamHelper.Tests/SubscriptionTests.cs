@@ -697,9 +697,13 @@ public class TwitchSubscriptionApiTests
 
         await client.CreateSubscriptionAsync("channel.chat.message", "SESS-C", CancellationToken.None);
         await client.CreateSubscriptionAsync("channel.subscribe", "SESS-C", CancellationToken.None);
+        await client.CreateSubscriptionAsync("channel.chat.notification", "SESS-C", CancellationToken.None);
 
         var chat = da.Requests[0];
         var other = da.Requests[1];
+        var notice = da.Requests[2];
+        Assert.Contains("\"type\":\"channel.chat.notification\"", notice);
+        Assert.Contains("\"user_id\":\"777\"", notice.Replace("\"broadcaster_user_id\":\"777\"", ""));
         Assert.Contains("\"type\":\"channel.chat.message\"", chat);
         Assert.Contains("\"broadcaster_user_id\":\"777\"", chat);
         Assert.Contains("\"user_id\":\"777\"", chat);

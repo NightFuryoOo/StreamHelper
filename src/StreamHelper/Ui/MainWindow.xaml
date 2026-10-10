@@ -144,6 +144,59 @@
             </DataTemplate.Triggers>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type m:ChannelMoment}">
+            <Border x:Name="card" Margin="0,0,0,8" Padding="12,10" CornerRadius="8"
+                    Background="{StaticResource CardBrush}" BorderThickness="3,0,0,0" BorderBrush="Transparent">
+                <DockPanel>
+                    <ToggleButton DockPanel.Dock="Left" Style="{StaticResource SelectBox}" VerticalAlignment="Top" Margin="0,0,10,0"
+                                  AutomationProperties.Name="Выбрать" IsChecked="{Binding Selected, Mode=TwoWay}"/>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="kind" Grid.Row="0" Grid.Column="1" Text="{Binding KindText}" FontSize="12"
+                                   Foreground="{StaticResource AccentBrush}" Margin="10,2,0,0"/>
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Detail}" FontSize="13" Margin="0,2,0,0"
+                                   Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding TimeText}" FontSize="11" Margin="0,2,0,0"
+                                   Foreground="{StaticResource MutedBrush}"/>
+                        <TextBox Style="{StaticResource Selectable}" Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding Message, Mode=OneWay}"
+                                 TextWrapping="Wrap" Margin="0,6,0,0" Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}"/>
+                        <DockPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,10,0,0" LastChildFill="False">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Удалить"
+                                    Foreground="{StaticResource DangerBrush}" Click="OnDeleteMomentClick"/>
+                            <ToggleButton DockPanel.Dock="Left" Style="{StaticResource Chip}" Content="✓ Посмотрел"
+                                          Tag="#4C9AFF" IsChecked="{Binding Seen, Mode=TwoWay}"/>
+                        </DockPanel>
+                    </Grid>
+                </DockPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsRaid}" Value="True">
+                    <Setter TargetName="kind" Property="Foreground" Value="{StaticResource WarnBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsNew}" Value="True">
+                    <Setter TargetName="card" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Seen}" Value="True">
+                    <Setter TargetName="card" Property="Opacity" Value="0.7"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Selected}" Value="True">
+                    <Setter TargetName="card" Property="Background" Value="#2A3550"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type m:Follower}">
             <Border x:Name="card" Margin="0,0,0,8" Padding="12,10" CornerRadius="8"
                     Background="{StaticResource CardBrush}" BorderThickness="3,0,0,0" BorderBrush="Transparent">
@@ -458,6 +511,15 @@
                             </Border>
                         </StackPanel>
                     </RadioButton>
+                    <RadioButton Style="{StaticResource TabButton}" GroupName="tabs" Margin="2,0,0,0"
+                                 AutomationProperties.Name="Рейды и стрики" IsChecked="{Binding IsMomentsTab, Mode=TwoWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Рейды и стрики"/>
+                            <Border Style="{StaticResource Badge}" DataContext="{Binding Moments}">
+                                <TextBlock Text="{Binding UnseenCount}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            </Border>
+                        </StackPanel>
+                    </RadioButton>
                 </WrapPanel>
                 <Button Grid.Row="0" Grid.Column="3" Style="{StaticResource FlatButton}" Content="⚙" FontSize="15" Click="OnSettingsClick"
                         ToolTip="Настройки"/>
@@ -504,6 +566,50 @@
                                 <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Donations.Items.Count}" Value="0">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMomentsTab}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
+                        <ItemsControl ItemsSource="{Binding Moments.Items}" Margin="0,0,6,6"/>
+                    </ScrollViewer>
+                    <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
+                            Visibility="{Binding MomentSelection.HasAny, Converter={StaticResource BoolVis}}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="{Binding MomentSelection.Count}"
+                                    ContentStringFormat="Удалить ({0})"
+                                    AutomationProperties.Name="{Binding MomentSelection.Count, StringFormat='Удалить ({0})'}" Foreground="{StaticResource DangerBrush}" Click="OnDeleteSelectedMomentsClick"/>
+                            <Button HorizontalAlignment="Left" Style="{StaticResource FlatButton}" Content="{Binding MomentSelection.ToggleAllText}"
+                                    Click="OnSelectAllMomentsClick"/>
+                        </DockPanel>
+                    </Border>
+                    <TextBlock Grid.RowSpan="2" Text="{Binding MomentsEmptyText}" TextAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" Margin="24,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Moments.Items.Count}" Value="0">
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </Style.Triggers>
