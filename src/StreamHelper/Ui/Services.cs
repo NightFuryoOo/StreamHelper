@@ -25,6 +25,7 @@ public sealed class Services
     public required ToastService Toasts { get; init; }
     public required ChatFeed ChatFeed { get; init; }
     public required ChatOverlayService Chat { get; init; }
+    public required ImageCache Images { get; init; }
     public required RewardAlertService RewardAlert { get; init; }
     public required MuteBadgeService MuteBadge { get; init; }
     public required MainViewModel ViewModel { get; init; }
@@ -247,10 +248,10 @@ public sealed class Services
         _ = RewardMute.SyncAsync();
     }
 
-    public bool ChangeChannel(ModeratedChannel? channel)
+    public bool ChangeChannel(ModeratedChannel? channel, bool asViewer = false)
     {
         var settings = Settings.Current;
-        if (!settings.SelectChannel(channel?.Id ?? "", channel?.Login ?? "", channel?.Name ?? ""))
+        if (!settings.SelectChannel(channel?.Id ?? "", channel?.Login ?? "", channel?.Name ?? "", asViewer))
         {
             Settings.Save();
             return false;

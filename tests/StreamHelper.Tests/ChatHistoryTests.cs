@@ -72,6 +72,23 @@ public class ChatHistoryTests
         Assert.Equal("n10", history[0].Text);
         Assert.Equal("n" + (ChatFeed.KeepHistory + 9), history[^1].Text);
     }
+
+    [Fact]
+    public void A_deleted_message_stays_marked_for_every_window_until_the_channel_changes()
+    {
+        var feed = new ChatFeed();
+        feed.Push(Msg("a", "42", "viewer", "раз", DateTime.UtcNow));
+
+        Assert.False(feed.IsDeleted("a"));
+        feed.MarkDeleted("a");
+        feed.MarkDeleted("");
+        Assert.True(feed.IsDeleted("a"));
+        Assert.False(feed.IsDeleted(""));
+        Assert.False(feed.IsDeleted("b"));
+
+        feed.Clear();
+        Assert.False(feed.IsDeleted("a"));
+    }
 }
 
 public class StreamStartTests

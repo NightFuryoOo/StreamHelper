@@ -34,6 +34,11 @@ public sealed class FollowerPoller : PollingService
             SetStatus(SyncState.NotConnected, "Фолловеры: Twitch не подключён. Подключи аккаунт в настройках, вкладка «Twitch».");
             return false;
         }
+        if (!settings.IsOwnChannel)
+        {
+            SetStatus(SyncState.NotConnected, settings.OnlyOwnChannelText("Фолловеры"));
+            return false;
+        }
 
         var result = await FollowerSync.FetchNewAsync(
             _source, settings.LastFollowerAtUtc, settings.LastFollowerUserIds, settings.FollowersBaselined, ct);

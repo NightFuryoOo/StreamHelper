@@ -20,8 +20,11 @@ public sealed class ChatFeed
     private readonly Queue<ChatMessage> _history = new();
     private readonly Queue<string> _idOrder = new();
     private readonly HashSet<string> _ids = new();
+    private readonly HashSet<string> _deleted = new();
 
     public event Action<ChatMessage>? Message;
+
+    public event Action<IReadOnlyList<string>>? Deleted;
 
     public void Push(ChatMessage message)
     {
@@ -49,7 +52,46 @@ public sealed class ChatFeed
             _history.Clear();
             _idOrder.Clear();
             _ids.Clear();
+            _deleted.Clear();
         }
+    }
+
+    public void MarkDeleted(string messageId)
+    {
+        if (messageId.Length == 0) return;
+        bool added;
+        lock (_gate) added = _deleted.Add(messageId);
+        if (added) Deleted?.Invoke(new[] { messageId });
+    }
+
+    public void Remove(ChatRemoval removal)
+    {
+        if (removal.Kind == ChatRemovalKind.Message)
+        {
+            MarkDeleted(removal.MessageId);
+            return;
+        }
+        var login = removal.UserLogin.ToLowerInvariant();
+        var ids = new List<string>();
+        lock (_gate)
+        {
+            foreach (var message in _history)
+            {
+                if (message.MessageId.Length == 0) continue;
+                if (removal.Kind == ChatRemovalKind.User && !IsAuthor(message, removal.UserId, login)) continue;
+                if (_deleted.Add(message.MessageId)) ids.Add(message.MessageId);
+            }
+        }
+        if (ids.Count > 0) Deleted?.Invoke(ids);
+    }
+
+    private static bool IsAuthor(ChatMessage message, string userId, string login) =>
+        userId.Length > 0 && message.ChatterId.Length > 0 ? message.ChatterId == userId : login.Length > 0 && message.ChatterLogin.ToLowerInvariant() == login;
+
+    public bool IsDeleted(string messageId)
+    {
+        if (messageId.Length == 0) return false;
+        lock (_gate) return _deleted.Contains(messageId);
     }
 
     public IReadOnlyList<ChatMessage> Recent()

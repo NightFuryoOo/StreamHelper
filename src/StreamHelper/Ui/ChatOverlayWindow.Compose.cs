@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Storage;
@@ -25,13 +26,12 @@ public partial class ChatOverlayWindow
     private void InitCompose(IChatSendApi chatSend)
     {
         _chatSend = chatSend;
-        Deactivated += (_, _) =>
-        {
-            if (_typing) EndTyping(returnFocus: false);
-        };
+        ComposeText.EmoteUrl = name => _emotes.Library?.UrlFor(name);
+        ComposeText.Images = _emotes;
+        Deactivated += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(CheckTypingFocus));
         _typingWatch.Tick += (_, _) =>
         {
-            if (_typing && NativeMethods.GetForegroundWindow() != _handle) EndTyping(returnFocus: false);
+            CheckTypingFocus();
         };
         PreviewMouseLeftButtonDown += (_, e) =>
         {
@@ -46,10 +46,20 @@ public partial class ChatOverlayWindow
     {
         var shown = !_positioning && (_typing || (_settings.Current.ChatTypingMode && _interactive));
         ComposeBox.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        if (!shown) HideEmotes(focusInput: false);
         ReplyBar.Visibility = _replyTo != null ? Visibility.Visible : Visibility.Collapsed;
         if (_replyTo != null) ReplyText.Text = "Ответ для " + NameOf(_replyTo);
         ComposeHint.Text = _replyTo != null ? "Ответить…" : "Написать в чат…";
         ComposeHint.Visibility = ComposeText.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSendButton();
+    }
+
+    private void UpdateSendButton()
+    {
+        var shown = ComposeText.Text.Trim().Length > 0;
+        if (shown && SendButton.Visibility != Visibility.Visible) SendButton.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150)));
+        SendButton.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        SendButton.IsEnabled = !_sending;
     }
 
     private void SetTypingMode(bool on)
@@ -89,6 +99,7 @@ public partial class ChatOverlayWindow
             NativeMethods.RemoveExStyle(_handle, NativeMethods.WsExNoActivate);
             TypingChanged?.Invoke(true);
             _ = DrainAsync();
+            _ = LoadInputEmotesAsync();
         }
         Activate();
         NativeMethods.SetForegroundWindow(_handle);
@@ -103,12 +114,20 @@ public partial class ChatOverlayWindow
         }));
     }
 
+    private async Task LoadInputEmotesAsync()
+    {
+        if (_emotes.Library is not { } library) return;
+        await library.EnsureLoadedAsync();
+        if (_typing) ComposeText.Refresh();
+    }
+
     public void EndTyping(bool returnFocus)
     {
         if (!_typing) return;
         _typing = false;
         _typingWatch.Stop();
         HideMentions();
+        HideEmotes(focusInput: false);
         Keyboard.ClearFocus();
         if (_handle != IntPtr.Zero) NativeMethods.AddExStyle(_handle, NativeMethods.WsExNoActivate);
         var back = _typingReturnTo;
@@ -147,7 +166,15 @@ public partial class ChatOverlayWindow
     private void OnComposeTextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
         ComposeHint.Visibility = ComposeText.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSendButton();
         UpdateMentions();
+    }
+
+    private async void OnSendClick(object sender, RoutedEventArgs e)
+    {
+        HideMentions();
+        await SendTypedAsync();
+        if (_typing) ComposeText.Focus();
     }
 
     private async void OnComposeKeyDown(object sender, KeyEventArgs e)
@@ -155,6 +182,12 @@ public partial class ChatOverlayWindow
         if (HandleMentionKey(e))
         {
             e.Handled = true;
+            return;
+        }
+        if (e.Key == Key.Escape && EmotesShown)
+        {
+            e.Handled = true;
+            HideEmotes(focusInput: true);
             return;
         }
         if (e.Key == Key.Escape)
@@ -176,6 +209,7 @@ public partial class ChatOverlayWindow
         var text = ComposeText.Text.Trim();
         if (text.Length == 0 || _sending || _chatSend == null) return;
         _sending = true;
+        UpdateSendButton();
         ShowComposeError("");
         ChatSendResult result;
         try
@@ -190,6 +224,7 @@ public partial class ChatOverlayWindow
         finally
         {
             _sending = false;
+            UpdateSendButton();
         }
         if (result.Success)
         {

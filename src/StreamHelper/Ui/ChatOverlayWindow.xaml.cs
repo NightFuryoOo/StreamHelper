@@ -9,11 +9,11 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Storage;
 using StreamHelper.Sync;
+using static StreamHelper.Ui.Freezables;
 
 namespace StreamHelper.Ui;
 
@@ -31,6 +31,7 @@ public partial class ChatOverlayWindow : Window
     private static readonly TimeSpan FadeOutTime = TimeSpan.FromMilliseconds(300);
 
     private static readonly Brush TextBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xE6, 0xE8, 0xEE)));
+    private static readonly Brush MutedBrush = Frozen(new SolidColorBrush(Color.FromRgb(0x9A, 0xA3, 0xB2)));
     private static readonly Brush ActionsBack = Frozen(new SolidColorBrush(Color.FromArgb(0xEE, 0x14, 0x17, 0x1D)));
     private static readonly Brush ActionsLine = Frozen(new SolidColorBrush(Color.FromRgb(0x3A, 0x3F, 0x4B)));
     private static readonly Brush DoneBrush = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0x20)));
@@ -47,10 +48,10 @@ public partial class ChatOverlayWindow : Window
     private readonly ChatBadgeCatalog _badges;
     private readonly IModerationApi _moderation;
     private readonly ChatEmotes _emotes;
-    private readonly Dictionary<string, BitmapImage> _images = new();
     private readonly HashSet<string> _shown = new();
     private readonly Queue<ChatMessage> _pending = new();
     private readonly List<ChatLine> _lines = new();
+    private readonly HashSet<string> _deletedIds = new();
     private readonly DispatcherTimer _idle = new() { Interval = IdleExit };
 
     private readonly DispatcherTimer _front = new() { Interval = TimeSpan.FromSeconds(3) };
@@ -66,10 +67,12 @@ public partial class ChatOverlayWindow : Window
     private double _scroll;
 
     public ChatOverlayWindow(
-        SettingsStore settings, ChatBadgeCatalog badges, IModerationApi moderation, ChatEmotes emotes, IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend)
+        SettingsStore settings, ChatBadgeCatalog badges, IModerationApi moderation, ChatEmotes emotes, IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend,
+        ChatterDirectory? present = null)
     {
         InitializeComponent();
         _settings = settings;
+        _present = present;
         _badges = badges;
         _moderation = moderation;
         _emotes = emotes;
@@ -277,6 +280,7 @@ public partial class ChatOverlayWindow : Window
             line.Box.BorderBrush = LineFor(line.Message);
             line.Text.Foreground = TextFor(line.Message);
             line.Text.FontSize = size;
+            if (line.Reply != null) line.Reply.FontSize = ReplySize(size);
             foreach (var inline in line.Text.Inlines)
             {
                 if (inline is not InlineUIContainer { Child: Image image }) continue;
@@ -375,7 +379,9 @@ public partial class ChatOverlayWindow : Window
         foreach (var inline in _emotes.Inlines(message, size)) text.Inlines.Add(inline);
 
         var root = new Grid { Background = Brushes.Transparent };
-        root.Children.Add(text);
+        var reply = message.Reply is { } parent ? ReplyLine(parent, size) : null;
+        if (reply == null) root.Children.Add(text);
+        else root.Children.Add(new StackPanel { Children = { reply, text } });
         var box = new Border
         {
             Child = root,
@@ -385,7 +391,7 @@ public partial class ChatOverlayWindow : Window
             Padding = new Thickness(6, 2, 6, 2),
             Margin = new Thickness(0, 0, 0, 2),
         };
-        var line = new ChatLine(message, root, box, text, nickBrush);
+        var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply };
         if (CanModerate(message)) AddActions(line);
         box.MouseRightButtonUp += (_, e) =>
         {
@@ -401,8 +407,13 @@ public partial class ChatOverlayWindow : Window
                 if (_scroll > 0) SetScroll(_scroll + box.ActualHeight + box.Margin.Bottom);
             };
         }
+        else if (IsVisible && !_fadingOut && ChatPlacement.ClampAppearMs(_settings.Current.ChatAppearMs) is > 0 and var appearMs)
+        {
+            Appear(box, TimeSpan.FromMilliseconds(appearMs));
+        }
         Lines.Children.Add(box);
         _lines.Add(line);
+        if (_deletedIds.Contains(message.MessageId)) MarkDeleted(line);
         while (Lines.Children.Count > MaxLines)
         {
             Lines.Children.RemoveAt(0);
@@ -410,12 +421,56 @@ public partial class ChatOverlayWindow : Window
         }
     }
 
+    public static double ReplySize(double size) => Math.Round(size * 0.85, 1);
+
+    private static TextBlock ReplyLine(ChatReply parent, double size)
+    {
+        var line = new TextBlock { FontSize = ReplySize(size), Foreground = MutedBrush, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 0, 1) };
+        line.Inlines.Add(new Run("↪ Ответ для "));
+        line.Inlines.Add(new Run(parent.ParentLabel) { FontWeight = FontWeights.SemiBold });
+        if (parent.ParentText.Length > 0) line.Inlines.Add(new Run(": " + parent.ParentText));
+        return line;
+    }
+
+    private void Appear(Border box, TimeSpan duration)
+    {
+        box.Height = 0;
+        box.Opacity = 0;
+        box.ClipToBounds = true;
+        void Start(object sender, RoutedEventArgs e)
+        {
+            box.Loaded -= Start;
+            var inner = Math.Max(0, Lines.ActualWidth - box.Padding.Left - box.Padding.Right - box.BorderThickness.Left - box.BorderThickness.Right);
+            box.Child.Measure(new Size(inner, double.PositiveInfinity));
+            var target = box.Child.DesiredSize.Height + box.Padding.Top + box.Padding.Bottom + box.BorderThickness.Top + box.BorderThickness.Bottom;
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var grow = new DoubleAnimation(0, target, duration) { EasingFunction = ease };
+            grow.Completed += (_, _) =>
+            {
+                box.BeginAnimation(HeightProperty, null);
+                box.ClearValue(HeightProperty);
+                box.ClipToBounds = false;
+            };
+            var fade = new DoubleAnimation(0, 1, duration) { EasingFunction = ease };
+            fade.Completed += (_, _) =>
+            {
+                box.BeginAnimation(OpacityProperty, null);
+                box.Opacity = 1;
+            };
+            box.BeginAnimation(HeightProperty, grow);
+            box.BeginAnimation(OpacityProperty, fade);
+        }
+        box.Loaded += Start;
+    }
+
     public void ResetChannel()
     {
         _chatters.Clear();
         HideMentions();
+        HideEmotes(focusInput: false);
         Lines.Children.Clear();
         _lines.Clear();
+        _deletedIds.Clear();
         _pending.Clear();
         _shown.Clear();
         _shoutouts = new ShoutoutLimits();
@@ -439,6 +494,7 @@ public partial class ChatOverlayWindow : Window
         public Grid Root { get; }
         public Border Box { get; }
         public TextBlock Text { get; }
+        public TextBlock? Reply { get; init; }
         public Brush NickBrush { get; }
         public Border? Actions { get; set; }
         public IconButton? Mute { get; set; }
@@ -467,9 +523,4 @@ public partial class ChatOverlayWindow : Window
 
     private void OnGripCompleted(object sender, DragCompletedEventArgs e) => GeometryChanged?.Invoke();
 
-    private static T Frozen<T>(T freezable) where T : Freezable
-    {
-        freezable.Freeze();
-        return freezable;
-    }
 }

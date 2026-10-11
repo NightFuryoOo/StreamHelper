@@ -268,7 +268,7 @@ public class MomentListenerTests
             Assert.True(await Wait.Until(() => { lock (pings) return pings.Count >= 1; }));
             await Task.Delay(300);
 
-            Assert.Equal(new[] { EventSubParser.ChatMessageType, EventSubParser.ChatNoticeType }, api.Calls.Select(c => c.Type).ToArray());
+            Assert.Equal(new[] { EventSubParser.ChatMessageType, EventSubParser.ChatNoticeType, EventSubParser.ChatDeleteType, EventSubParser.ChatClearUserType, EventSubParser.ChatClearType }, api.Calls.Select(c => c.Type).ToArray());
             lock (moments) Assert.Equal(new[] { ("nm-1", MomentKind.Raid), ("nm-3", MomentKind.Streak) }, moments.Select(m => (m.Key, m.Kind)).ToArray());
             lock (pings) Assert.Equal(new[] { "m1" }, pings.Select(p => p.Key).ToArray());
         }

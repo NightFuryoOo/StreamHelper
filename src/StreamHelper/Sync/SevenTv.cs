@@ -6,20 +6,10 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using StreamHelper.Storage;
 
 namespace StreamHelper.Sync;
 
-public sealed record SevenTvEmote(string Name, string Url, bool Animated);
-
-public interface ISevenTvApi
-{
-    Task<IReadOnlyList<SevenTvEmote>> GetGlobalAsync(CancellationToken ct);
-
-    Task<IReadOnlyList<SevenTvEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct);
-}
-
-public sealed class SevenTvClient : ISevenTvApi
+public sealed class SevenTvClient : IExtraEmoteApi
 {
     public const string DefaultBase = "https://7tv.io";
 
@@ -32,17 +22,17 @@ public sealed class SevenTvClient : ISevenTvApi
         _base = string.IsNullOrWhiteSpace(baseUrl) ? DefaultBase : baseUrl.TrimEnd('/');
     }
 
-    public async Task<IReadOnlyList<SevenTvEmote>> GetGlobalAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<ExtraEmote>> GetGlobalAsync(CancellationToken ct)
     {
         var body = await GetAsync($"{_base}/v3/emote-sets/global", ct);
-        return body == null ? Array.Empty<SevenTvEmote>() : ParseSet(body, "emotes");
+        return body == null ? Array.Empty<ExtraEmote>() : ParseSet(body, "emotes");
     }
 
-    public async Task<IReadOnlyList<SevenTvEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
+    public async Task<IReadOnlyList<ExtraEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(twitchUserId)) return Array.Empty<SevenTvEmote>();
+        if (string.IsNullOrWhiteSpace(twitchUserId)) return Array.Empty<ExtraEmote>();
         var body = await GetAsync($"{_base}/v3/users/twitch/{Uri.EscapeDataString(twitchUserId)}", ct);
-        return body == null ? Array.Empty<SevenTvEmote>() : ParseSet(body, "emote_set", "emotes");
+        return body == null ? Array.Empty<ExtraEmote>() : ParseSet(body, "emote_set", "emotes");
     }
 
     private async Task<string?> GetAsync(string url, CancellationToken ct)
@@ -53,9 +43,9 @@ public sealed class SevenTvClient : ISevenTvApi
         return await response.Content.ReadAsStringAsync(ct);
     }
 
-    public static IReadOnlyList<SevenTvEmote> ParseSet(string json, params string[] path)
+    public static IReadOnlyList<ExtraEmote> ParseSet(string json, params string[] path)
     {
-        var emotes = new List<SevenTvEmote>();
+        var emotes = new List<ExtraEmote>();
         try
         {
             using var doc = JsonDocument.Parse(json);
@@ -77,7 +67,7 @@ public sealed class SevenTvClient : ISevenTvApi
         return emotes;
     }
 
-    private static SevenTvEmote? ParseEmote(JsonElement item)
+    private static ExtraEmote? ParseEmote(JsonElement item)
     {
         if (item.ValueKind != JsonValueKind.Object) return null;
         var name = Text(item, "name");
@@ -100,104 +90,11 @@ public sealed class SevenTvClient : ISevenTvApi
         var chosen = files.FirstOrDefault(f => f.Equals("2x" + extension, StringComparison.OrdinalIgnoreCase))
                      ?? files.FirstOrDefault(f => f.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
         if (chosen == null) return null;
-        return new SevenTvEmote(name, baseUrl + "/" + chosen, animated);
+        return new ExtraEmote(name, baseUrl + "/" + chosen, animated);
     }
 
     private static string Text(JsonElement element, string property) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() ?? ""
             : "";
-}
-
-public sealed class SevenTvCatalog
-{
-    private static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan RenewAfter = TimeSpan.FromMinutes(30);
-
-    private readonly ISevenTvApi _api;
-    private readonly Func<string> _channelId;
-    private readonly object _gate = new();
-    private IReadOnlyDictionary<string, SevenTvEmote> _byName = new Dictionary<string, SevenTvEmote>();
-    private Task? _loading;
-    private DateTime _nextTryUtc;
-    private DateTime _renewUtc;
-    private int _generation;
-
-    public SevenTvCatalog(ISevenTvApi api, Func<string> channelId)
-    {
-        _api = api;
-        _channelId = channelId;
-    }
-
-    public int Count => _byName.Count;
-
-    public bool IsLoading
-    {
-        get
-        {
-            lock (_gate) return _loading is { IsCompleted: false };
-        }
-    }
-
-    public bool TryGet(string word, out SevenTvEmote emote) => _byName.TryGetValue(word, out emote!);
-
-    public Task EnsureLoadedAsync()
-    {
-        lock (_gate)
-        {
-            if (_loading is { IsCompleted: false }) return _loading;
-            var due = _byName.Count == 0 ? DateTime.UtcNow >= _nextTryUtc : DateTime.UtcNow >= _renewUtc;
-            if (!due) return Task.CompletedTask;
-            _loading = LoadAsync();
-            return _loading;
-        }
-    }
-
-    public void Reset()
-    {
-        lock (_gate)
-        {
-            _generation++;
-            _byName = new Dictionary<string, SevenTvEmote>();
-            _loading = null;
-            _nextTryUtc = default;
-            _renewUtc = default;
-        }
-    }
-
-    private async Task LoadAsync()
-    {
-        int generation;
-        lock (_gate) generation = _generation;
-        var map = new Dictionary<string, SevenTvEmote>(StringComparer.Ordinal);
-        var failed = false;
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            foreach (var emote in await _api.GetGlobalAsync(cts.Token)) map[emote.Name] = emote;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
-        {
-            failed = true;
-            Log.Write("7TV global emotes failed: " + ex.Message);
-        }
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            foreach (var emote in await _api.GetChannelAsync(_channelId(), cts.Token)) map[emote.Name] = emote;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
-        {
-            failed = true;
-            Log.Write("7TV channel emotes failed: " + ex.Message);
-        }
-
-        lock (_gate)
-        {
-            if (generation != _generation) return;
-            if (map.Count > 0 && (!failed || map.Count >= _byName.Count)) _byName = map;
-            _nextTryUtc = DateTime.UtcNow + RetryAfter;
-            _renewUtc = DateTime.UtcNow + (failed ? RetryAfter : RenewAfter);
-        }
-    }
 }

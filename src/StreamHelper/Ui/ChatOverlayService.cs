@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Windows;
 using StreamHelper.Api;
@@ -18,6 +19,7 @@ public sealed class ChatOverlayService : IPositionable
     private readonly IVoteApi _votes;
     private readonly VoteWatcher _watcher;
     private readonly IChatSendApi _chatSend;
+    private readonly ChatterDirectory? _present;
     private ChatOverlayWindow? _window;
     private ChatHistoryWindow? _history;
     private IntPtr _historyReturnTo;
@@ -25,9 +27,10 @@ public sealed class ChatOverlayService : IPositionable
 
     public ChatOverlayService(
         SettingsStore settings, ChatFeed feed, ChatBadgeCatalog badges, IModerationApi moderation, IStreamApi streams, ChatEmotes emotes,
-        IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend)
+        IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend, IChattersApi? chatters = null)
     {
         _chatSend = chatSend;
+        if (chatters != null) _present = new ChatterDirectory(chatters, () => settings.Current.HasTwitchTokens && settings.Current.HasChattersScope && !settings.Current.IsViewerChannel);
         _votes = votes;
         _watcher = watcher;
         watcher.Changed += OnVotesChanged;
@@ -38,6 +41,7 @@ public sealed class ChatOverlayService : IPositionable
         _badges = badges;
         _moderation = moderation;
         feed.Message += OnMessage;
+        feed.Deleted += OnDeleted;
     }
 
     public bool IsPositioning => _positioning;
@@ -114,6 +118,7 @@ public sealed class ChatOverlayService : IPositionable
     public void ResetChannel()
     {
         _feed.Clear();
+        _present?.Reset();
         _badges.Reset();
         _emotes.ResetChannel();
         _history?.Close();
@@ -127,6 +132,7 @@ public sealed class ChatOverlayService : IPositionable
     public void Close()
     {
         _feed.Message -= OnMessage;
+        _feed.Deleted -= OnDeleted;
         _watcher.Changed -= OnVotesChanged;
         _history?.Close();
         _window?.Close();
@@ -138,12 +144,17 @@ public sealed class ChatOverlayService : IPositionable
         if (_window != null) return _window;
         _ = _badges.EnsureLoadedAsync();
         _ = _emotes.EnsureCatalogAsync();
-        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend);
+        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend, _present);
         window.TypingChanged += typing => TypingChanged?.Invoke(typing);
         window.GeometryChanged += window.SaveGeometry;
         window.HistoryRequested += OnHistoryRequested;
+        window.MessageDeleted += OnChatMessageDeleted;
         _window = window;
-        foreach (var message in _feed.Recent()) window.AddMessage(message);
+        foreach (var message in _feed.Recent())
+        {
+            if (_feed.IsDeleted(message.MessageId)) window.ShowDeleted(message.MessageId);
+            window.AddMessage(message);
+        }
         window.ShowVotes(_watcher.Poll, _watcher.Prediction);
         return window;
     }
@@ -169,10 +180,25 @@ public sealed class ChatOverlayService : IPositionable
             old.Closed -= OnHistoryClosed;
             old.Close();
         }
-        var window = new ChatHistoryWindow(_feed, message, since, _emotes);
+        var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel);
         window.Closed += OnHistoryClosed;
         _history = window;
         window.Show();
+    }
+
+    private void OnChatMessageDeleted(string messageId) => _feed.MarkDeleted(messageId);
+
+    private void OnDeleted(IReadOnlyList<string> ids)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        dispatcher?.InvokeAsync(() =>
+        {
+            foreach (var id in ids)
+            {
+                _window?.ShowDeleted(id);
+                _history?.ShowDeleted(id);
+            }
+        });
     }
 
     private void OnHistoryClosed(object? sender, EventArgs e)

@@ -49,6 +49,8 @@ public partial class SettingsWindow
         if (!settings.HasChatWriteScope) missing.Add("сообщения в чат");
         if (!settings.HasDeleteMessagesScope) missing.Add("удаление сообщений");
         if (!settings.HasBitsScope) missing.Add("Bits");
+        if (!settings.HasEmotesScope) missing.Add("свои смайлы");
+        if (!settings.HasChattersScope) missing.Add("зрители в чате (для @)");
         RefreshChannelBlock();
         if (missing.Count == 0)
         {

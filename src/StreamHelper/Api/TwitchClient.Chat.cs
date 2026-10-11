@@ -15,6 +15,13 @@ public interface IChatSendApi
     Task<ChatSendResult> SendChatMessageAsync(string text, string? replyToMessageId, CancellationToken ct);
 }
 
+public sealed record ChatterInfo(string Id, string Login, string Name);
+
+public interface IChattersApi
+{
+    Task<IReadOnlyList<ChatterInfo>> GetChattersAsync(CancellationToken ct);
+}
+
 public interface IBadgeApi
 {
     Task<IReadOnlyDictionary<string, string>> GetBadgeImagesAsync(CancellationToken ct);
@@ -103,6 +110,52 @@ public sealed partial class TwitchClient
         if (status == (HttpStatusCode)429) return "Слишком часто: подожди немного.";
         if (status == HttpStatusCode.BadRequest) return message.Length > 0 ? "Twitch отказал: " + message : "Twitch отказал.";
         return $"Twitch: HTTP {(int)status}.";
+    }
+
+    private const int MaxChatterPages = 5;
+
+    public async Task<IReadOnlyList<ChatterInfo>> GetChattersAsync(CancellationToken ct)
+    {
+        if (!Settings.HasChattersScope) throw new AuthRequiredException("Чтобы подсказывать всех зрителей в чате, переподключи Twitch во вкладке «Twitch»: нужно новое право.");
+        var all = new List<ChatterInfo>();
+        string? cursor = null;
+        for (var page = 0; page < MaxChatterPages; page++)
+        {
+            var url = _endpoints.ChatChattersUrl + "?broadcaster_id=" + Uri.EscapeDataString(Settings.ChannelId) +
+                      "&moderator_id=" + Uri.EscapeDataString(Settings.TwitchUserId) + "&first=1000";
+            if (cursor != null) url += "&after=" + Uri.EscapeDataString(cursor);
+            var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+            ThrowIfUnauthorized(status, "Twitch не отдал список зрителей: переподключи Twitch.");
+            if (status == HttpStatusCode.Forbidden) throw new HttpRequestException("Twitch не отдал список зрителей: нужно быть модератором канала.");
+            if (status == (HttpStatusCode)429) throw new HttpRequestException("Twitch: слишком много запросов (HTTP 429).");
+            if (status != HttpStatusCode.OK) throw new HttpRequestException($"Twitch: HTTP {(int)status}.");
+            var (items, next) = ParseChatters(body);
+            all.AddRange(items);
+            if (string.IsNullOrEmpty(next) || next == cursor || items.Count == 0) break;
+            cursor = next;
+        }
+        return all;
+    }
+
+    public static (IReadOnlyList<ChatterInfo> Items, string? Cursor) ParseChatters(string json)
+    {
+        var items = new List<ChatterInfo>();
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in data.EnumerateArray())
+            {
+                var login = ReadString(item, "user_login");
+                if (login.Length > 0) items.Add(new ChatterInfo(ReadString(item, "user_id"), login, ReadString(item, "user_name")));
+            }
+        }
+        string? cursor = null;
+        if (doc.RootElement.TryGetProperty("pagination", out var pagination) && pagination.ValueKind == JsonValueKind.Object)
+        {
+            var value = ReadString(pagination, "cursor");
+            if (value.Length > 0) cursor = value;
+        }
+        return (items, cursor);
     }
 
     public async Task<IReadOnlyDictionary<string, string>> GetBadgeImagesAsync(CancellationToken ct)

@@ -17,6 +17,8 @@ public partial class SettingsWindow
         var muteMinutes = ChatPlacement.ClampMuteMinutes(settings.ChatMuteMinutes);
         ChatMuteSlider.Value = muteMinutes;
         ChatMuteText.Text = ChatPlacement.DescribeDuration(muteMinutes * 60);
+        ChatAppearSlider.Value = ChatPlacement.ClampAppearMs(settings.ChatAppearMs);
+        ChatAppearText.Text = ChatPlacement.DescribeAppear(ChatPlacement.ClampAppearMs(settings.ChatAppearMs));
     }
 
     private void ApplyChatStatus(SyncStatus status)
@@ -49,6 +51,15 @@ public partial class SettingsWindow
         _services.Settings.Current.ChatMuteMinutes = minutes;
         _services.Settings.Save();
         _services.Chat.Apply();
+    }
+
+    private void OnChatAppearChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_loading) return;
+        var ms = ChatPlacement.ClampAppearMs((int)Math.Round(ChatAppearSlider.Value));
+        ChatAppearText.Text = ChatPlacement.DescribeAppear(ms);
+        _services.Settings.Current.ChatAppearMs = ms;
+        _services.Settings.Save();
     }
 
     private void OnChatPosition(object sender, RoutedEventArgs e) => TogglePositioning(_services.Chat, ChatPositionButton);

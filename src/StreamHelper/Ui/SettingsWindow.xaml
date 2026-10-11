@@ -450,9 +450,20 @@
                             <TextBlock Text="Канал" Style="{StaticResource Heading}" VerticalAlignment="Center"/>
                         </DockPanel>
                         <WrapPanel x:Name="ChannelChoices" Margin="0,2,0,0"/>
+                        <TextBlock x:Name="ModeratedLabel" Text="Где ты модератор" Style="{StaticResource Label}"/>
+                        <WrapPanel x:Name="ModeratedChoices"/>
                         <TextBlock x:Name="ChannelStatusText" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                        <TextBlock Text="Как зритель" Style="{StaticResource Label}"/>
+                        <WrapPanel x:Name="ViewerChoices"/>
+                        <DockPanel Margin="0,6,0,0">
+                            <Button x:Name="ViewerAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Подключить"
+                                    Margin="8,0,0,0" Click="OnAddViewerChannel"/>
+                            <TextBox x:Name="ViewerChannelInput" AutomationProperties.Name="Ник канала" PreviewKeyDown="OnViewerChannelKeyDown"
+                                     ToolTip="Ник канала или ссылка twitch.tv/…: подключишься к его чату как зритель"/>
+                        </DockPanel>
+                        <TextBlock x:Name="ViewerStatusText" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
                         <TextBlock Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
-                                   Text="На канале, где ты модератор, работают чат поверх игры, бан и мут, «Отметить», пинги, рейды и стрики и фолловеры. Подписки, награды за баллы, опросы и предикты остаются только на своём канале."/>
+                                   Text="Где ты модератор: чат поверх игры, бан и мут, удаление сообщений и «Отметить». Как зритель: только чат поверх игры и сообщения в чат. Уведомления (пинги, рейды и стрики, фолловеры), подписки, награды за баллы, опросы и предикты работают только на своём канале."/>
                     </StackPanel>
 
                 </StackPanel>
@@ -889,6 +900,21 @@
                                 IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
                                 AutomationProperties.Name="Размер текста чата" ValueChanged="OnChatSliderChanged"/>
                         <TextBlock x:Name="ChatFontText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Foreground="{StaticResource MutedBrush}"/>
+                    </Grid>
+
+                    <Grid Margin="0,24,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="190"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="60"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Появление сообщений" VerticalAlignment="Center"/>
+                        <Slider x:Name="ChatAppearSlider" Grid.Column="1" Minimum="0" Maximum="1000" TickFrequency="50"
+                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                AutomationProperties.Name="Плавность появления сообщений" ValueChanged="OnChatAppearChanged"
+                                ToolTip="Сколько длится плавное появление нового сообщения. Влево до упора: сразу, без анимации."/>
+                        <TextBlock x:Name="ChatAppearText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
                                    Foreground="{StaticResource MutedBrush}"/>
                     </Grid>
 

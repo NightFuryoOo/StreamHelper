@@ -154,13 +154,20 @@ public partial class App : Application
         };
         viewModel.ApplyHiddenTabs(settings.Current);
         var chatFeed = new ChatFeed();
-        var sevenTv = new SevenTvCatalog(new SevenTvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_7TV_URL")), () => settings.Current.ChannelId);
-        var emotes = new ChatEmotes(sevenTv, new EmoteImageCache(_http), twitchEndpoints);
+        var extraEmotes = new ExtraEmoteCatalog(
+            new ExtraEmoteSources(
+                ("7TV", new SevenTvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_7TV_URL"))),
+                ("BTTV", new BttvClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_BTTV_URL"))),
+                ("FFZ", new FfzClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_FFZ_URL")))),
+            () => settings.Current.ChannelId);
+        var images = new ImageCache(_http);
+        var emotes = new ChatEmotes(extraEmotes, images, twitchEndpoints, new EmoteLibrary(twitch, extraEmotes, settings, twitchEndpoints));
         var votes = new VoteWatcher(settings, twitch);
 
         var services = new Services
         {
             Settings = settings,
+            Images = images,
             Donations = donations,
             Followers = followers,
             Subscribers = subscribers,
@@ -172,7 +179,7 @@ public partial class App : Application
             Hotkey = new HotkeyService(),
             Toasts = new ToastService(settings),
             ChatFeed = chatFeed,
-            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch),
+            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch, twitch),
             Votes = votes,
             RewardAlert = new RewardAlertService(settings),
             RewardMute = new RewardMuteSwitch(settings, twitch),
@@ -221,9 +228,9 @@ public partial class App : Application
         Track(services.RewardListener, viewModel.ApplyRewardStatus);
         services.PingListener = new PingListener(
             settings, twitch, eventSubUrl, OnUi<ChatPing>(OnPings), services.ChatFeed.Push,
-            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })));
-        Track(services.PingListener, viewModel.ApplyPingStatus);
-        Track(services.PingListener, viewModel.ApplyMomentStatus);
+            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })), services.ChatFeed.Remove);
+        Track(services.PingListener, status => viewModel.ApplyPingStatus(PingListener.TabStatus(status, settings.Current)));
+        Track(services.PingListener, status => viewModel.ApplyMomentStatus(PingListener.TabStatus(status, settings.Current)));
     }
 
     private void CreateTray(Services services)

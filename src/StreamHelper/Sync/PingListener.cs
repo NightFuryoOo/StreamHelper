@@ -11,31 +11,57 @@ public sealed class PingListener : EventSubListener<ChatPing>
 {
     public static readonly string[] PingTypes = { EventSubParser.ChatMessageType, EventSubParser.ChatNoticeType };
 
+    public static readonly EventSubOptionalType[] RemovalTypes =
+    {
+        new(EventSubParser.ChatDeleteType, TwitchClient.ChatScope),
+        new(EventSubParser.ChatClearUserType, TwitchClient.ChatScope),
+        new(EventSubParser.ChatClearType, TwitchClient.ChatScope),
+    };
+
     private static readonly EventSubFeature Feature = new(
         "Пинги",
         TwitchClient.ChatScope,
         PingTypes,
         "Для пингов, рейдов и стриков переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.",
-        FollowsChannel: true);
+        FollowsChannel: true,
+        OptionalTypes: RemovalTypes);
 
     private readonly SettingsStore _settings;
     private readonly Action<ChatMessage>? _onChat;
     private readonly Action<ChannelMoment>? _onMoment;
+    private readonly Action<ChatRemoval>? _onRemoval;
 
     public PingListener(
         SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<ChatPing>, Task> deliver,
-        Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null)
+        Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null, Action<ChatRemoval>? onRemoval = null)
         : base(settings, api, url, Feature, deliver)
     {
         _settings = settings;
         _onChat = onChat;
         _onMoment = onMoment;
+        _onRemoval = onRemoval;
     }
+
+    public static SyncStatus TabStatus(SyncStatus status, AppSettings settings) =>
+        status.State == SyncState.Ok && !settings.IsOwnChannel ? new SyncStatus(SyncState.NotConnected, settings.OnlyOwnChannelText(Feature.Label)) : status;
 
     protected override ChatPing? Select(EventSubMessage message)
     {
+        if (message.Removal is { } removal)
+        {
+            try
+            {
+                _onRemoval?.Invoke(removal);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Chat removal delivery failed: " + ex.Message);
+            }
+            return null;
+        }
         if (message.Moment is { } moment)
         {
+            if (!_settings.Current.IsOwnChannel) return null;
             try
             {
                 _onMoment?.Invoke(moment);
@@ -58,7 +84,7 @@ public sealed class PingListener : EventSubListener<ChatPing>
         {
             Log.Write("Chat window failed: " + ex.Message);
         }
-        if (!isPing) return null;
+        if (!isPing || !settings.IsOwnChannel) return null;
 
         return new ChatPing
         {

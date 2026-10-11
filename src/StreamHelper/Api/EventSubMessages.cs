@@ -16,7 +16,8 @@ public sealed record EventSubMessage(
     Subscriber? Subscriber,
     Redemption? Redemption,
     ChatMessage? Chat = null,
-    ChannelMoment? Moment = null);
+    ChannelMoment? Moment = null,
+    ChatRemoval? Removal = null);
 
 public sealed record ChatMention(string UserId, string Login, string Name);
 
@@ -24,10 +25,24 @@ public sealed record ChatBadge(string SetId, string Id);
 
 public sealed record ChatFragment(string Type, string Text, string EmoteId = "", bool Animated = false);
 
+public sealed record ChatReply(string ParentMessageId, string ParentUserLogin, string ParentUserName, string ParentText)
+{
+    public string ParentLabel => ParentUserName.Length > 0 ? ParentUserName : ParentUserLogin;
+}
+
 public sealed record ChatMessage(
     string MessageId, string ChatterId, string ChatterLogin, string ChatterName, string Text,
     IReadOnlyList<ChatMention> Mentions, DateTime AtUtc, string Color = "", IReadOnlyList<ChatBadge>? Badges = null,
-    IReadOnlyList<ChatFragment>? Fragments = null, bool IsPing = false);
+    IReadOnlyList<ChatFragment>? Fragments = null, bool IsPing = false, ChatReply? Reply = null);
+
+public enum ChatRemovalKind
+{
+    Message,
+    User,
+    All,
+}
+
+public sealed record ChatRemoval(ChatRemovalKind Kind, string MessageId = "", string UserId = "", string UserLogin = "");
 
 public static class EventSubParser
 {
@@ -35,6 +50,12 @@ public static class EventSubParser
     public const string ChatMessageType = "channel.chat.message";
     public const string ChatNoticeType = "channel.chat.notification";
     public const string BitsUseType = "channel.bits.use";
+    public const string ChatDeleteType = "channel.chat.message_delete";
+    public const string ChatClearUserType = "channel.chat.clear_user_messages";
+    public const string ChatClearType = "channel.chat.clear";
+
+    public static bool IsChatType(string type) =>
+        type is ChatMessageType or ChatNoticeType or ChatDeleteType or ChatClearUserType or ChatClearType;
 
     public static EventSubMessage? Parse(string json)
     {
@@ -66,16 +87,18 @@ public static class EventSubParser
             Redemption? redemption = null;
             ChatMessage? chat = null;
             ChannelMoment? moment = null;
+            ChatRemoval? removal = null;
             if (type == "notification" && payload.ValueKind == JsonValueKind.Object &&
                 payload.TryGetProperty("event", out var ev) && ev.ValueKind == JsonValueKind.Object)
             {
                 if (subscriptionType == RedemptionType) redemption = BuildRedemption(messageId, timestamp, ev);
                 else if (subscriptionType == ChatMessageType) chat = BuildChat(messageId, timestamp, ev);
                 else if (subscriptionType == ChatNoticeType) moment = BuildMoment(messageId, timestamp, ev);
+                else if (subscriptionType is ChatDeleteType or ChatClearUserType or ChatClearType) removal = BuildRemoval(subscriptionType, ev);
                 else subscriber = BuildSubscriber(subscriptionType, messageId, timestamp, ev);
             }
 
-            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment);
+            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment, removal);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
@@ -130,11 +153,34 @@ public static class EventSubParser
             }
         }
 
+        ChatReply? reply = null;
+        if (ev.TryGetProperty("reply", out var parent) && parent.ValueKind == JsonValueKind.Object)
+        {
+            reply = new ChatReply(ReadString(parent, "parent_message_id"), ReadString(parent, "parent_user_login"), ReadString(parent, "parent_user_name"), ReadString(parent, "parent_message_body"));
+            if (reply.ParentLabel.Length == 0 && reply.ParentText.Length == 0) reply = null;
+        }
+
         var chatMessageId = ReadString(ev, "message_id");
         return new ChatMessage(
             chatMessageId.Length > 0 ? chatMessageId : messageId,
             ReadString(ev, "chatter_user_id"), ReadString(ev, "chatter_user_login"), ReadString(ev, "chatter_user_name"),
-            text, mentions, messageAt, ReadString(ev, "color"), badges, parts.Count > 0 ? parts : null);
+            text, mentions, messageAt, ReadString(ev, "color"), badges, parts.Count > 0 ? parts : null, Reply: reply);
+    }
+
+    private static ChatRemoval? BuildRemoval(string subscriptionType, JsonElement ev)
+    {
+        switch (subscriptionType)
+        {
+            case ChatDeleteType:
+                var id = ReadString(ev, "message_id");
+                return id.Length > 0 ? new ChatRemoval(ChatRemovalKind.Message, id, ReadString(ev, "target_user_id"), ReadString(ev, "target_user_login")) : null;
+            case ChatClearUserType:
+                var userId = ReadString(ev, "target_user_id");
+                var login = ReadString(ev, "target_user_login");
+                return userId.Length > 0 || login.Length > 0 ? new ChatRemoval(ChatRemovalKind.User, UserId: userId, UserLogin: login) : null;
+            default:
+                return new ChatRemoval(ChatRemovalKind.All);
+        }
     }
 
     private static ChannelMoment? BuildMoment(string messageId, DateTime at, JsonElement ev)

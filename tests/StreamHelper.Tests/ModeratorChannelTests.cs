@@ -1,5 +1,6 @@
 using System.Net;
 using StreamHelper.Api;
+using StreamHelper.Models;
 using StreamHelper.Storage;
 using StreamHelper.Sync;
 using StreamHelper.Ui;
@@ -272,7 +273,7 @@ public class ModeratorSyncTests
         {
             Assert.True(await Wait.Until(() => listener.Status.State == SyncState.Ok));
             Assert.Equal("Подключено · streamer · канал Big_Streamer", listener.Status.Message);
-            Assert.Equal(2, api.CallCount);
+            Assert.Equal(5, api.CallCount);
         }
         finally
         {
@@ -280,6 +281,90 @@ public class ModeratorSyncTests
         }
     }
 
+    [Fact]
+    public async Task On_someone_elses_channel_the_chat_flows_but_pings_raids_and_streaks_stay_silent()
+    {
+        using var dir = new TempDir();
+        using var server = new MockEventSubServer();
+        server.OnConnection = async (_, _, socket) =>
+        {
+            await MockEventSubServer.SendAsync(socket, MockEventSubServer.Welcome("SESS-Q"));
+            await Wait.Until(() => false, 300);
+            await MockEventSubServer.SendAsync(socket, MockEventSubServer.Notification("n1", EventSubParser.ChatMessageType,
+                ChatJson.Event("m1", "42", "alice", "Alice", "@streamer привет", ("777", "streamer"))));
+            await MockEventSubServer.SendAsync(socket, MockEventSubServer.Notification("n2", EventSubParser.ChatNoticeType, NoticeJson.Raid("nm-1", "raider", "Raider", 50)));
+            await MockEventSubServer.SendAsync(socket, MockEventSubServer.Notification("n3", EventSubParser.ChatMessageType, ChatJson.Event("m2", "43", "bob", "Bob", "последнее")));
+            await Task.Delay(Timeout.Infinite);
+        };
+        var settings = OnOtherChannel(dir);
+        var pings = new List<ChatPing>();
+        var moments = new List<ChannelMoment>();
+        var chat = new List<ChatMessage>();
+        var listener = new PingListener(settings, new FakeEventSubApi(), server.Url(), items =>
+        {
+            lock (pings) pings.AddRange(items);
+            return Task.CompletedTask;
+        }, message =>
+        {
+            lock (chat) chat.Add(message);
+        }, moment =>
+        {
+            lock (moments) moments.Add(moment);
+        }) { IdleDelay = TimeSpan.FromMilliseconds(200) };
+
+        listener.Start();
+        try
+        {
+            Assert.True(await Wait.Until(() => { lock (chat) return chat.Count >= 2; }));
+            await Task.Delay(300);
+            lock (chat) Assert.Equal(new[] { ("m1", true), ("m2", false) }, chat.Select(m => (m.MessageId, m.IsPing)).ToArray());
+            lock (pings) Assert.Empty(pings);
+            lock (moments) Assert.Empty(moments);
+            Assert.Equal("Подключено · streamer · канал Big_Streamer", listener.Status.Message);
+            var tab = PingListener.TabStatus(listener.Status, settings.Current);
+            Assert.Equal(SyncState.NotConnected, tab.State);
+            Assert.Equal("Пинги: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", tab.Message);
+            Assert.Equal("Рейды и стрики: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", MainViewModel.MomentStatusText(tab));
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
+    public void On_the_own_channel_the_ping_tabs_show_the_connection_as_it_is()
+    {
+        var own = new AppSettings { TwitchUserId = "777", TwitchLogin = "streamer" };
+        var status = new SyncStatus(SyncState.Ok, "Подключено · streamer");
+
+        Assert.Same(status, PingListener.TabStatus(status, own));
+        var other = new AppSettings { TwitchUserId = "777", TwitchLogin = "streamer" };
+        other.SelectChannel("555", "big_streamer", "Big_Streamer");
+        var error = new SyncStatus(SyncState.Error, "Пинги: нет связи");
+        Assert.Same(error, PingListener.TabStatus(error, other));
+    }
+
+    [Fact]
+    public async Task Followers_are_not_polled_on_someone_elses_channel()
+    {
+        using var dir = new TempDir();
+        var settings = OnOtherChannel(dir);
+        var source = new FakeFollowerSource(new() { [""] = MakeFollower.Page(null, MakeFollower.F("a", 10)) });
+        var delivered = new List<Follower>();
+        var poller = new FollowerPoller(settings, source, items =>
+        {
+            delivered.AddRange(items);
+            return Task.CompletedTask;
+        });
+
+        Assert.False(await poller.PollOnceAsync(CancellationToken.None));
+
+        Assert.Empty(source.Requested);
+        Assert.Empty(delivered);
+        Assert.Equal(SyncState.NotConnected, poller.Status.State);
+        Assert.Equal("Фолловеры: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", poller.Status.Message);
+    }
     [Fact]
     public async Task Polls_and_predictions_are_not_read_on_someone_elses_channel()
     {
@@ -341,16 +426,16 @@ public class ModeratorSyncTests
         Assert.Equal("https://cdn/sub2.png", catalog.UrlFor("subscriber", "0"));
     }
 
-    private sealed class ChannelSevenTv : ISevenTvApi
+    private sealed class ChannelSevenTv : IExtraEmoteApi
     {
         public List<string> Asked = new();
 
-        public Task<IReadOnlyList<SevenTvEmote>> GetGlobalAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<SevenTvEmote>>(Array.Empty<SevenTvEmote>());
+        public Task<IReadOnlyList<ExtraEmote>> GetGlobalAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ExtraEmote>>(Array.Empty<ExtraEmote>());
 
-        public Task<IReadOnlyList<SevenTvEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
+        public Task<IReadOnlyList<ExtraEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
         {
             Asked.Add(twitchUserId);
-            return Task.FromResult<IReadOnlyList<SevenTvEmote>>(new[] { new SevenTvEmote("Pog" + twitchUserId, "https://cdn/" + twitchUserId, false) });
+            return Task.FromResult<IReadOnlyList<ExtraEmote>>(new[] { new ExtraEmote("Pog" + twitchUserId, "https://cdn/" + twitchUserId, false) });
         }
     }
 
@@ -359,7 +444,7 @@ public class ModeratorSyncTests
     {
         var api = new ChannelSevenTv();
         var channel = "777";
-        var catalog = new SevenTvCatalog(api, () => channel);
+        var catalog = new ExtraEmoteCatalog(api, () => channel);
         await catalog.EnsureLoadedAsync();
 
         channel = "555";
@@ -370,5 +455,123 @@ public class ModeratorSyncTests
         Assert.Equal(new[] { "777", "555" }, api.Asked.ToArray());
         Assert.True(catalog.TryGet("Pog555", out _));
         Assert.False(catalog.TryGet("Pog777", out _));
+    }
+}
+
+public class ViewerChannelTests
+{
+    private static AppSettings Signed() => new() { TwitchUserId = "777", TwitchLogin = "streamer" };
+
+    [Theory]
+    [InlineData("shroud", "shroud")]
+    [InlineData("  @Shroud ", "shroud")]
+    [InlineData("https://www.twitch.tv/Shroud/videos", "shroud")]
+    [InlineData("twitch.tv/some_user_42?referrer=raid", "some_user_42")]
+    [InlineData("", null)]
+    [InlineData("two words", null)]
+    [InlineData("ab", null)]
+    [InlineData("канал", null)]
+    [InlineData("https://www.twitch.tv/", null)]
+    public void A_channel_is_typed_as_a_nick_or_a_link(string text, string? expected)
+    {
+        Assert.Equal(expected, ChatRules.ChannelLogin(text));
+    }
+
+    [Fact]
+    public void A_channel_joined_as_a_viewer_is_told_apart_from_a_moderated_one()
+    {
+        var settings = Signed();
+
+        Assert.True(settings.SelectChannel("900", "viewme", "ViewMe", asViewer: true));
+        Assert.True(settings.IsViewerChannel);
+        Assert.Equal("900", settings.ChannelId);
+        Assert.Equal("Подключено · streamer · канал ViewMe (зритель)", settings.ConnectedText);
+        Assert.Equal("Канал · ViewMe (зритель)", ChatRules.ChannelHeader(settings));
+        Assert.False(settings.SelectChannel("900", "viewme", "ViewMe", asViewer: true));
+
+        Assert.True(settings.SelectChannel("900", "viewme", "ViewMe"));
+        Assert.False(settings.IsViewerChannel);
+        Assert.Equal("Подключено · streamer · канал ViewMe", settings.ConnectedText);
+
+        Assert.True(settings.SelectChannel("777", "streamer", "Streamer", asViewer: true));
+        Assert.True(settings.IsOwnChannel);
+        Assert.False(settings.IsViewerChannel);
+    }
+
+    [Fact]
+    public void On_a_viewer_channel_nobody_can_be_banned_muted_or_shouted_out()
+    {
+        var settings = Signed();
+        var message = new ChatMessage("m1", "42", "alice", "Alice", "привет", Array.Empty<ChatMention>(), DateTime.UtcNow);
+
+        settings.SelectChannel("900", "viewme", "ViewMe");
+        Assert.True(ChatRules.CanModerate(message, settings));
+        settings.SelectChannel("900", "viewme", "ViewMe", asViewer: true);
+        Assert.False(ChatRules.CanModerate(message, settings));
+    }
+
+    [Fact]
+    public void A_viewer_channel_missing_from_the_moderated_list_is_not_a_warning()
+    {
+        var settings = Signed();
+        settings.TwitchScopes = TwitchClient.Scopes;
+        var moderated = new[] { new ModeratedChannel("555", "big_streamer", "Big_Streamer") };
+
+        settings.SelectChannel("900", "viewme", "ViewMe", asViewer: true);
+        Assert.Equal(("", false), ChatRules.ChannelStatus(settings, moderated, false, null));
+        settings.SelectChannel("900", "viewme", "ViewMe");
+        Assert.True(ChatRules.ChannelStatus(settings, moderated, false, null).Warn);
+    }
+
+    [Fact]
+    public void Viewer_channels_are_kept_newest_first_without_repeats_and_up_to_ten()
+    {
+        var settings = Signed();
+        for (var i = 1; i <= 12; i++) settings.RememberViewerChannel(new SavedChannel("id" + i, "c" + i, "C" + i));
+        settings.RememberViewerChannel(new SavedChannel("id5", "c5", "C5 renamed"));
+
+        Assert.Equal(AppSettings.ViewerChannelLimit, settings.ViewerChannels.Count);
+        Assert.Equal("C5 renamed", settings.ViewerChannels[0].Label);
+        Assert.Equal(new[] { "id5", "id12", "id11" }, settings.ViewerChannels.Take(3).Select(c => c.Id).ToArray());
+        Assert.True(settings.ForgetViewerChannel("id12"));
+        Assert.False(settings.ForgetViewerChannel("id12"));
+        Assert.Equal("c", new SavedChannel("x", "c", "").Label);
+    }
+
+    [Fact]
+    public void Viewer_channels_and_the_viewer_choice_are_saved_on_this_pc()
+    {
+        using var dir = new TempDir();
+        var settings = MakeFollower.Settings(dir);
+        settings.Current.RememberViewerChannel(new SavedChannel("900", "viewme", "ViewMe"));
+        settings.Current.SelectChannel("900", "viewme", "ViewMe", asViewer: true);
+        settings.Save();
+
+        var json = File.ReadAllText(dir.File("settings.json"));
+        var again = new SettingsStore(dir.File("settings.json"));
+
+        Assert.DoesNotContain("\"Label\"", json);
+        Assert.Equal(new[] { new SavedChannel("900", "viewme", "ViewMe") }, again.Current.ViewerChannels);
+        Assert.True(again.Current.IsViewerChannel);
+        Assert.Contains(nameof(AppSettings.ViewerChannels), Profile.LocalSettings);
+        Assert.Contains(nameof(AppSettings.TwitchChannelAsViewer), Profile.LocalSettings);
+    }
+
+    [Fact]
+    public async Task A_channel_is_found_by_its_nick()
+    {
+        using var dir = new TempDir();
+        using var da = new MockDa();
+        da.Handler = (request, _) => request.QueryString["login"] == "viewme"
+            ? (200, "{\"data\":[{\"id\":\"900\",\"login\":\"viewme\",\"display_name\":\"ViewMe\",\"profile_image_url\":\"\"}]}")
+            : (200, "{\"data\":[]}");
+        var client = new TwitchClient(MakeFollower.Settings(dir), new HttpClient { Timeout = TimeSpan.FromSeconds(10) }, TwitchEndpoints.FromBase(da.BaseUrl));
+
+        var found = await client.GetUserByLoginAsync("viewme", CancellationToken.None);
+        var missing = await client.GetUserByLoginAsync("nobody_here", CancellationToken.None);
+
+        Assert.Equal(new TwitchUser("900", "viewme", "ViewMe", ""), found);
+        Assert.Null(missing);
+        Assert.StartsWith("GET /helix/users?login=viewme ", da.Requests[0]);
     }
 }

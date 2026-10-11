@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Media;
 using StreamHelper.Models;
 using StreamHelper.Sync;
+using static StreamHelper.Ui.Freezables;
 
 namespace StreamHelper.Ui;
 
@@ -80,9 +81,9 @@ public abstract class VoteModelBase : INotifyPropertyChanged
 
 public sealed class VoteRowModel : VoteModelBase
 {
-    private static readonly Brush PollBar = Frozen(Color.FromRgb(0xA9, 0x70, 0xFF));
-    private static readonly Brush BlueBar = Frozen(Color.FromRgb(0x38, 0x7A, 0xFF));
-    private static readonly Brush PinkBar = Frozen(Color.FromRgb(0xF5, 0x00, 0x9B));
+    private static readonly Brush PollBar = Solid(Color.FromRgb(0xA9, 0x70, 0xFF));
+    private static readonly Brush BlueBar = Solid(Color.FromRgb(0x38, 0x7A, 0xFF));
+    private static readonly Brush PinkBar = Solid(Color.FromRgb(0xF5, 0x00, 0x9B));
 
     private string _label = "";
     private string _detail = "";
@@ -163,12 +164,6 @@ public sealed class VoteRowModel : VoteModelBase
         Raise(nameof(WinName));
     }
 
-    private static Brush Frozen(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
-    }
 }
 
 public sealed class VoteCardModel : VoteModelBase

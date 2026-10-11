@@ -61,7 +61,7 @@ public static class EmoteDecoder
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException or ArgumentException
                                        or System.Runtime.InteropServices.COMException or FileFormatException)
         {
-            Log.Write("Emote picture could not be read: " + ex.Message);
+            Log.Write("Picture could not be read: " + ex.Message);
             return null;
         }
     }
@@ -176,7 +176,7 @@ public static class EmoteDecoder
     }
 }
 
-public sealed class EmoteImageCache
+public sealed class ImageCache
 {
     private const int MaxBytes = 3 * 1024 * 1024;
     private const int KeepAtMost = 400;
@@ -185,7 +185,7 @@ public sealed class EmoteImageCache
     private readonly HttpClient _http;
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
 
-    public EmoteImageCache(HttpClient http) => _http = http;
+    public ImageCache(HttpClient http) => _http = http;
 
     private sealed record Entry(Task<EmoteFrames?> Task, DateTime StartedUtc);
 
@@ -218,7 +218,7 @@ public sealed class EmoteImageCache
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
         {
-            Log.Write("Emote picture failed: " + ex.Message);
+            Log.Write("Picture failed: " + ex.Message);
             return null;
         }
     }

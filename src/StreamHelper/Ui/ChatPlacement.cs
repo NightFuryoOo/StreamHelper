@@ -24,6 +24,13 @@ public static class ChatPlacement
     public static int ClampMuteMinutes(int value) =>
         value <= 0 ? DefaultMuteMinutes : Math.Clamp(value, MinMuteMinutes, MaxMuteMinutes);
 
+    public const int MaxAppearMs = 1000;
+
+    public static int ClampAppearMs(int value) => Math.Clamp(value, 0, MaxAppearMs);
+
+    public static string DescribeAppear(int ms) =>
+        ms <= 0 ? "сразу" : (ms / 1000.0).ToString("0.##", System.Globalization.CultureInfo.GetCultureInfo("ru-RU")) + " с";
+
     public static string DescribeDuration(int seconds)
     {
         if (seconds % 86400 == 0) return seconds == 86400 ? "сутки" : $"{seconds / 86400} сут";

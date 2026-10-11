@@ -18,25 +18,36 @@ public sealed class ChatEmotes
 
     private static readonly TimeSpan PreloadWait = TimeSpan.FromSeconds(3);
 
-    private readonly SevenTvCatalog _seven;
-    private readonly EmoteImageCache _images;
+    private readonly ExtraEmoteCatalog _extra;
+    private readonly ImageCache _images;
     private readonly TwitchEndpoints _endpoints;
     private readonly EmoteAnimator _animator = new();
 
-    public ChatEmotes(SevenTvCatalog seven, EmoteImageCache images, TwitchEndpoints endpoints)
+    public ChatEmotes(ExtraEmoteCatalog extra, ImageCache images, TwitchEndpoints endpoints, EmoteLibrary? library = null)
     {
-        _seven = seven;
+        _extra = extra;
         _images = images;
         _endpoints = endpoints;
+        Library = library;
     }
+
+    public EmoteLibrary? Library { get; }
+
+    public EmoteFrames? CachedImage(string url) => _images.Get(url);
+
+    public Task<EmoteFrames?> ImageAsync(string url) => _images.LoadAsync(url);
 
     public static double HeightFor(double fontSize) => Math.Round(fontSize * 1.8);
 
-    public Task EnsureCatalogAsync() => _seven.EnsureLoadedAsync();
+    public Task EnsureCatalogAsync() => _extra.EnsureLoadedAsync();
 
-    public void ResetChannel() => _seven.Reset();
+    public void ResetChannel()
+    {
+        _extra.Reset();
+        Library?.Reset();
+    }
 
-    public bool CatalogLoading => _seven.IsLoading;
+    public bool CatalogLoading => _extra.IsLoading;
 
     public sealed record Piece(string Text, string? Url);
 
@@ -62,7 +73,7 @@ public sealed class ChatEmotes
             }
             foreach (var token in Split(fragment.Text))
             {
-                if (token.Length > 0 && token[0] != ' ' && _seven.TryGet(token, out var emote))
+                if (token.Length > 0 && token[0] != ' ' && _extra.TryGet(token, out var emote))
                 {
                     Flush();
                     pieces.Add(new Piece(token, emote.Url));
@@ -96,7 +107,7 @@ public sealed class ChatEmotes
 
     private async Task PreloadCoreAsync(ChatMessage message)
     {
-        if (_seven.Count == 0) await _seven.EnsureLoadedAsync();
+        if (_extra.Count == 0) await _extra.EnsureLoadedAsync();
         var urls = Pieces(message).Where(p => p.Url != null).Select(p => p.Url!).Distinct().ToList();
         if (urls.Count > 0) await Task.WhenAll(urls.Select(u => _images.LoadAsync(u)));
     }
@@ -107,7 +118,7 @@ public sealed class ChatEmotes
     public async Task PreloadAsync(IEnumerable<ChatMessage> messages, TimeSpan wait)
     {
         var list = messages as IReadOnlyCollection<ChatMessage> ?? messages.ToList();
-        if (_seven.Count == 0) await Task.WhenAny(_seven.EnsureLoadedAsync(), Task.Delay(wait));
+        if (_extra.Count == 0) await Task.WhenAny(_extra.EnsureLoadedAsync(), Task.Delay(wait));
         var urls = Missing(list);
         if (urls.Count > 0) await Task.WhenAny(Task.WhenAll(urls.Select(u => _images.LoadAsync(u))), Task.Delay(wait));
     }

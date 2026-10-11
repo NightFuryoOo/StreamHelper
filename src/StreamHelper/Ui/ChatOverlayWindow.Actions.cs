@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Models;
@@ -178,13 +177,6 @@ public partial class ChatOverlayWindow
         line.Text.Inlines.Add(line.Shout);
     }
 
-    private const string MuteGlyph = "M2,6 H4.8 L8.6,2.8 V13.2 L4.8,10 H2 Z M11,5.8 L14.2,10.2 M14.2,5.8 L11,10.2";
-    private const string ClockGlyph = "M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 M8,5 V8.2 L10.4,9.8";
-    private const string BanGlyph = "M8,2 A6,6 0 1 1 8,14 A6,6 0 1 1 8,2 M3.8,3.8 L12.2,12.2";
-    private const string UndoGlyph = "M5,4 L2.5,6.5 L5,9 M2.8,6.5 H9 A3.5,3.5 0 0 1 9,13.5 H6";
-    private const string CheckGlyph = "M3,8.5 L6.4,12 L13,4.5";
-    private const string TrashGlyph = "M3.5,5 H12.5 M6.5,5 V3.5 H9.5 V5 M4.8,5 L5.4,13 H10.6 L11.2,5";
-
     private enum Armed
     {
         None,
@@ -193,85 +185,17 @@ public partial class ChatOverlayWindow
         Delete,
     }
 
-    private sealed class IconButton
-    {
-        private readonly Path _glyph;
-        private readonly TextBlock _label;
-        private readonly string _idleGlyph;
-        private readonly Brush _idleStroke;
-        private string _name;
-
-        public IconButton(string glyph, Brush stroke, Style style, string name)
-        {
-            _idleGlyph = glyph;
-            _idleStroke = stroke;
-            _name = name;
-            _glyph = new Path
-            {
-                Data = Geometry.Parse(glyph),
-                Stroke = stroke,
-                StrokeThickness = 1.6,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round,
-                Width = 16,
-                Height = 16,
-                Stretch = Stretch.None,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            _label = new TextBlock
-            {
-                Text = "Точно?",
-                FontSize = 12,
-                Margin = new Thickness(4, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Visibility = Visibility.Collapsed,
-            };
-            var content = new StackPanel { Orientation = Orientation.Horizontal };
-            content.Children.Add(_glyph);
-            content.Children.Add(_label);
-            Button = new Button { Content = content, Style = style, ToolTip = name };
-            System.Windows.Automation.AutomationProperties.SetName(Button, name);
-        }
-
-        public Button Button { get; }
-
-        public void Rename(string name)
-        {
-            _name = name;
-            Button.ToolTip = name;
-            System.Windows.Automation.AutomationProperties.SetName(Button, name);
-        }
-
-        public void ShowConfirm(Brush brush)
-        {
-            _glyph.Data = Geometry.Parse(CheckGlyph);
-            _glyph.Stroke = brush;
-            _label.Foreground = brush;
-            _label.Visibility = Visibility.Visible;
-            System.Windows.Automation.AutomationProperties.SetName(Button, "Точно? " + _name);
-        }
-
-        public void ShowIdle()
-        {
-            _glyph.Data = Geometry.Parse(_idleGlyph);
-            _glyph.Stroke = _idleStroke;
-            _label.Visibility = Visibility.Collapsed;
-            System.Windows.Automation.AutomationProperties.SetName(Button, _name);
-        }
-    }
-
     private string MuteName() => "Мут на " + ChatPlacement.DescribeDuration(ChatPlacement.ClampMuteMinutes(_settings.Current.ChatMuteMinutes) * 60);
 
     private void AddActions(ChatLine line)
     {
         var style = (Style)FindResource("ChatAction");
-        var mute = new IconButton(MuteGlyph, TextBrush, style, MuteName());
-        var custom = new IconButton(ClockGlyph, TextBrush, style, "Мут на своё время");
-        var ban = new IconButton(BanGlyph, ErrorBrush, style, "Бан");
-        var undo = new IconButton(UndoGlyph, TextBrush, style, "Снять");
+        var mute = new IconButton(Glyphs.Mute, TextBrush, style, MuteName());
+        var custom = new IconButton(Glyphs.Clock, TextBrush, style, "Мут на своё время");
+        var ban = new IconButton(Glyphs.Ban, ErrorBrush, style, "Бан");
+        var undo = new IconButton(Glyphs.Undo, TextBrush, style, "Снять");
         undo.Button.Visibility = Visibility.Collapsed;
-        var remove = new IconButton(TrashGlyph, TextBrush, style, "Удалить сообщение");
+        var remove = new IconButton(Glyphs.Trash, TextBrush, style, "Удалить сообщение");
         if (line.Message.MessageId.Length == 0) remove.Button.Visibility = Visibility.Collapsed;
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var button in new[] { remove, mute, custom, ban, undo }) buttons.Children.Add(button.Button);
@@ -407,6 +331,17 @@ public partial class ChatOverlayWindow
         RestartIdle();
     }
 
+    public event Action<string>? MessageDeleted;
+
+    public void ShowDeleted(string messageId)
+    {
+        if (messageId.Length == 0 || !_deletedIds.Add(messageId)) return;
+        foreach (var line in _lines)
+        {
+            if (line.Message.MessageId == messageId) MarkDeleted(line);
+        }
+    }
+
     private async Task DeleteMessageAsync(ChatLine line)
     {
         var chatter = line.Message.ChatterId;
@@ -422,7 +357,12 @@ public partial class ChatOverlayWindow
             result = new ModerationResult(false, "Ошибка: " + ex.Message);
         }
         SetBusy(chatter, false);
-        if (result.Success) MarkDeleted(line);
+        if (result.Success)
+        {
+            MarkDeleted(line);
+            _deletedIds.Add(line.Message.MessageId);
+            MessageDeleted?.Invoke(line.Message.MessageId);
+        }
         else ShowStatus(line, result.Message, ErrorBrush);
         Disarm(line);
         RestartIdle();

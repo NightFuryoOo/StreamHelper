@@ -9,6 +9,11 @@ using System.Text.Json.Serialization;
 
 namespace StreamHelper.Storage;
 
+public sealed record SavedChannel(string Id, string Login, string Name)
+{
+    [JsonIgnore] public string Label => Name.Length > 0 ? Name : Login;
+}
+
 internal static class Secrets
 {
     public static string Protect(string plain)
@@ -140,13 +145,33 @@ public sealed class AppSettings
 
     [JsonIgnore] public string ChannelLabel => IsOwnChannel ? TwitchLogin : TwitchChannelName.Length > 0 ? TwitchChannelName : TwitchChannelLogin;
 
-    [JsonIgnore]
-    public string ConnectedText => IsOwnChannel ? $"Подключено · {TwitchLogin}" : $"Подключено · {TwitchLogin} · канал {ChannelLabel}";
+    public string OnlyOwnChannelText(string label) => $"{label}: только на своём канале. Сейчас выбран канал {ChannelLabel} (вкладка «Twitch»).";
 
-    public bool SelectChannel(string id, string login, string name)
+    [JsonIgnore]
+    public string ConnectedText => IsOwnChannel ? $"Подключено · {TwitchLogin}" : $"Подключено · {TwitchLogin} · канал {ChannelLabel}" + (IsViewerChannel ? " (зритель)" : "");
+
+    public bool TwitchChannelAsViewer { get; set; }
+
+    [JsonIgnore] public bool IsViewerChannel => !IsOwnChannel && TwitchChannelAsViewer;
+
+    public const int ViewerChannelLimit = 10;
+
+    public List<SavedChannel> ViewerChannels { get; set; } = new();
+
+    public void RememberViewerChannel(SavedChannel channel)
+    {
+        ViewerChannels.RemoveAll(c => c.Id == channel.Id);
+        ViewerChannels.Insert(0, channel);
+        if (ViewerChannels.Count > ViewerChannelLimit) ViewerChannels.RemoveRange(ViewerChannelLimit, ViewerChannels.Count - ViewerChannelLimit);
+    }
+
+    public bool ForgetViewerChannel(string id) => ViewerChannels.RemoveAll(c => c.Id == id) > 0;
+
+    public bool SelectChannel(string id, string login, string name, bool asViewer = false)
     {
         if (id == TwitchUserId) id = login = name = "";
-        if (id == TwitchChannelId)
+        var viewer = id.Length > 0 && asViewer;
+        if (id == TwitchChannelId && viewer == TwitchChannelAsViewer)
         {
             TwitchChannelLogin = login;
             TwitchChannelName = name;
@@ -155,6 +180,7 @@ public sealed class AppSettings
         TwitchChannelId = id;
         TwitchChannelLogin = login;
         TwitchChannelName = name;
+        TwitchChannelAsViewer = viewer;
         FollowersBaselined = false;
         LastFollowerAtUtc = default;
         LastFollowerUserIds = new List<string>();
@@ -224,6 +250,8 @@ public sealed class AppSettings
     public const string DefaultPingColor = "#FF9F0A";
     public bool ChatPingHighlight { get; set; } = true;
     public string ChatPingColor { get; set; } = DefaultPingColor;
+    public List<string> ChatRecentEmotes { get; set; } = new();
+    public int ChatAppearMs { get; set; } = 250;
     public double ChatOpacity { get; set; } = 0.6;
 
     public double ChatCellOpacity { get; set; } = 0.2;
@@ -397,6 +425,12 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool HasBitsScope => HasScope("bits:read");
+
+    [JsonIgnore]
+    public bool HasEmotesScope => HasScope("user:read:emotes");
+
+    [JsonIgnore]
+    public bool HasChattersScope => HasScope("moderator:read:chatters");
 
     [JsonIgnore]
     public string RedirectUri => $"http://127.0.0.1:{RedirectPort}/callback";

@@ -89,7 +89,7 @@ public class BitsParsingTests
     [Fact]
     public void Bits_are_part_of_the_requested_rights()
     {
-        Assert.EndsWith(" bits:read", TwitchClient.Scopes);
+        Assert.Contains(" bits:read", TwitchClient.Scopes);
         Assert.False(new AppSettings { TwitchScopes = "channel:read:subscriptions" }.HasBitsScope);
         Assert.True(new AppSettings { TwitchScopes = "channel:read:subscriptions bits:read" }.HasBitsScope);
     }

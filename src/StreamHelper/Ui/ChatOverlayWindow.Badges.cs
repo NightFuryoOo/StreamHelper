@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using StreamHelper.Api;
 
@@ -21,8 +21,10 @@ public partial class ChatOverlayWindow
         {
             var url = _badges.UrlFor(badge.SetId, badge.Id);
             if (url == null) continue;
-            var image = new Image { Source = ImageFor(url), Width = BadgeSize(fontSize), Height = BadgeSize(fontSize), Margin = new Thickness(0, 0, 4, 0) };
+            var image = new Image { Width = BadgeSize(fontSize), Height = BadgeSize(fontSize), Margin = new Thickness(0, 0, 4, 0) };
             RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            if (_emotes.CachedImage(url) is { } cached) image.Source = cached.Frames[0];
+            else _ = ShowBadgeAsync(image, url);
             inlines.Add(new InlineUIContainer(image) { BaselineAlignment = BaselineAlignment.Center });
         }
         return inlines;
@@ -43,15 +45,8 @@ public partial class ChatOverlayWindow
 
     private static double BadgeSize(double fontSize) => Math.Round(fontSize * 1.2);
 
-    private BitmapImage ImageFor(string url)
+    private async Task ShowBadgeAsync(Image image, string url)
     {
-        if (_images.TryGetValue(url, out var cached)) return cached;
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.UriSource = new Uri(url);
-        image.CacheOption = BitmapCacheOption.OnDemand;
-        image.EndInit();
-        _images[url] = image;
-        return image;
+        if (await _emotes.ImageAsync(url) is { } frames) image.Source = frames.Frames[0];
     }
 }

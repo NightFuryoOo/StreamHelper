@@ -51,6 +51,7 @@ public partial class SettingsWindow : Window
         Hook(() => services.RewardAlert.Failed += OnRewardAlertFailed, () => services.RewardAlert.Failed -= OnRewardAlertFailed);
         RefreshTwitchSummary();
         _ = LoadModeratedChannelsAsync();
+        StartLiveWatch();
         Closed += (_, _) => OnClosedCleanup();
 
         var section = settings.SettingsSection is >= 0 and <= 8 ? settings.SettingsSection : 0;
@@ -70,6 +71,7 @@ public partial class SettingsWindow : Window
 
     private void OnClosedCleanup()
     {
+        StopLiveWatch();
         foreach (var unhook in _unhook) unhook();
         _services.Chat.EndPositioning();
         _twitchCts?.Cancel();
@@ -106,9 +108,13 @@ public partial class SettingsWindow : Window
         WatchStatus(_services.FollowerPoller, status => ShowStatus(FollowersStatusText, FollowersStatusDot, status));
         WatchStatus(_services.SubscriptionListener, status => ShowStatus(SubsStatusText, SubsStatusDot, status));
         WatchStatus(_services.RewardListener, status => ShowStatus(RewardsStatusText, RewardsStatusDot, status));
-        WatchStatus(_services.PingListener, status => ShowStatus(PingsStatusText, PingsStatusDot, status));
+        WatchStatus(_services.PingListener, status => ShowStatus(PingsStatusText, PingsStatusDot, PingListener.TabStatus(status, _services.Settings.Current)));
         WatchStatus(_services.PingListener, ApplyChatStatus);
-        WatchStatus(_services.PingListener, status => ShowStatus(MomentsStatusText, MomentsStatusDot, status with { Message = MainViewModel.MomentStatusText(status) }));
+        WatchStatus(_services.PingListener, status =>
+        {
+            var moments = PingListener.TabStatus(status, _services.Settings.Current);
+            ShowStatus(MomentsStatusText, MomentsStatusDot, moments with { Message = MainViewModel.MomentStatusText(moments) });
+        });
     }
 
     private static Brush Resource(string key) => (Brush)Application.Current.Resources[key];

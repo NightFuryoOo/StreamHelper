@@ -152,8 +152,7 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         }
         if (!_feature.FollowsChannel && !settings.IsOwnChannel)
         {
-            return new SyncStatus(SyncState.NotConnected,
-                $"{_feature.Label}: только на своём канале. Сейчас выбран канал {settings.ChannelLabel} (вкладка «Twitch»).");
+            return new SyncStatus(SyncState.NotConnected, settings.OnlyOwnChannelText(_feature.Label));
         }
         return null;
     }

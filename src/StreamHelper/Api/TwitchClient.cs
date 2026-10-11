@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -42,6 +43,10 @@ public sealed record TwitchEndpoints(
 
     public string ModeratedChannelsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/channels";
 
+    public string ChatChattersUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/chatters";
+
+    public string ChatEmotesUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/emotes";
+
     public string ChatMessagesUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/messages";
 
     public string ModerationChatUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/chat";
@@ -78,7 +83,9 @@ public interface IFollowerSource
     Task<FollowerPage> GetFollowersAsync(string? cursor, CancellationToken ct);
 }
 
-public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi, IVoteApi, IChatSendApi
+public sealed record LiveStream(string UserId, string Login, string Game, string Title, int Viewers, DateTime? StartedUtc);
+
+public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi, IVoteApi, IChatSendApi, IEmoteApi, IChattersApi
 {
     public const string FollowerScope = "moderator:read:followers";
     public const string SubscriptionScope = "channel:read:subscriptions";
@@ -93,10 +100,12 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
     public const string ChatWriteScope = "user:write:chat";
     public const string DeleteMessagesScope = "moderator:manage:chat_messages";
     public const string BitsScope = "bits:read";
+    public const string EmotesScope = "user:read:emotes";
+    public const string ChattersScope = "moderator:read:chatters";
     public const int MaxChatMessage = 500;
     public const string Scopes = FollowerScope + " " + SubscriptionScope + " " + RedemptionScope + " " + ManageScope + " " + ChatScope + " " + ModerateScope +
                                  " " + PollScope + " " + PredictionScope + " " + ShoutoutScope + " " + ModeratedChannelsScope + " " + ChatWriteScope + " " + DeleteMessagesScope +
-                                 " " + BitsScope;
+                                 " " + BitsScope + " " + EmotesScope + " " + ChattersScope;
     private const string DeviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 
     private readonly SettingsStore _store;
@@ -211,8 +220,40 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
         return null;
     }
 
-    public async Task<DownloadedImage?> DownloadImageAsync(string url, CancellationToken ct)
+    public async Task<IReadOnlyList<LiveStream>> GetLiveStreamsAsync(IReadOnlyList<string> userIds, CancellationToken ct)
     {
+        var live = new List<LiveStream>();
+        var ids = userIds.Where(id => id.Length > 0).Distinct().ToList();
+        for (var i = 0; i < ids.Count; i += 100)
+        {
+            var batch = ids.Skip(i).Take(100);
+            var url = _endpoints.StreamsUrl + "?" + string.Join("&", batch.Select(id => "user_id=" + Uri.EscapeDataString(id))) + "&first=100";
+            var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+            ThrowIfUnauthorized(status, "Twitch не сказал, кто в эфире: переподключи Twitch.");
+            if (status == (HttpStatusCode)429) throw new HttpRequestException("Twitch: слишком много запросов (HTTP 429).");
+            if (status != HttpStatusCode.OK) throw new HttpRequestException($"Twitch: HTTP {(int)status}.");
+            live.AddRange(ParseLiveStreams(body));
+        }
+        return live;
+    }
+
+    public static IReadOnlyList<LiveStream> ParseLiveStreams(string json)
+    {
+        var live = new List<LiveStream>();
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return live;
+        foreach (var stream in data.EnumerateArray())
+        {
+            var id = ReadString(stream, "user_id");
+            if (id.Length == 0 || ReadString(stream, "type") != "live") continue;
+            var started = DateTime.TryParse(ReadString(stream, "started_at"), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var at) ? at : (DateTime?)null;
+            var viewers = stream.TryGetProperty("viewer_count", out var count) && count.ValueKind == JsonValueKind.Number && count.TryGetInt32(out var n) ? n : 0;
+            live.Add(new LiveStream(id, ReadString(stream, "user_login"), ReadString(stream, "game_name"), ReadString(stream, "title"), viewers, started));
+        }
+        return live;
+    }
+
+    public async Task<DownloadedImage?> DownloadImageAsync(string url, CancellationToken ct)    {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
         if (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)) return null;
 
@@ -270,6 +311,7 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
             Settings.TwitchChannelId = "";
             Settings.TwitchChannelLogin = "";
             Settings.TwitchChannelName = "";
+            Settings.TwitchChannelAsViewer = false;
         }
         Settings.TwitchUserId = userId;
         Settings.TwitchLogin = ReadString(first, "login");

@@ -185,8 +185,8 @@ public class SevenTvTests
     {
         var emotes = SevenTvClient.ParseSet(Set, "emotes").ToDictionary(e => e.Name);
 
-        Assert.Equal(new SevenTvEmote("furaNEGNORb", "https://cdn.7tv.app/emote/AAA/2x.gif", true), emotes["furaNEGNORb"]);
-        Assert.Equal(new SevenTvEmote("Still", "https://cdn.7tv.app/emote/BBB/2x.png", false), emotes["Still"]);
+        Assert.Equal(new ExtraEmote("furaNEGNORb", "https://cdn.7tv.app/emote/AAA/2x.gif", true), emotes["furaNEGNORb"]);
+        Assert.Equal(new ExtraEmote("Still", "https://cdn.7tv.app/emote/BBB/2x.png", false), emotes["Still"]);
     }
 
     [Fact]
@@ -220,26 +220,26 @@ public class SevenTvTests
         Assert.Empty(SevenTvClient.ParseSet("[]", "emotes"));
     }
 
-    private sealed class FakeApi : ISevenTvApi
+    private sealed class FakeApi : IExtraEmoteApi
     {
-        public List<SevenTvEmote> Global = new();
-        public List<SevenTvEmote> Channel = new();
+        public List<ExtraEmote> Global = new();
+        public List<ExtraEmote> Channel = new();
         public bool FailGlobal, FailChannel;
         public int Calls;
         public string? AskedChannel;
 
-        public Task<IReadOnlyList<SevenTvEmote>> GetGlobalAsync(CancellationToken ct)
+        public Task<IReadOnlyList<ExtraEmote>> GetGlobalAsync(CancellationToken ct)
         {
             Calls++;
             if (FailGlobal) throw new HttpRequestException("down");
-            return Task.FromResult<IReadOnlyList<SevenTvEmote>>(Global);
+            return Task.FromResult<IReadOnlyList<ExtraEmote>>(Global);
         }
 
-        public Task<IReadOnlyList<SevenTvEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
+        public Task<IReadOnlyList<ExtraEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct)
         {
             AskedChannel = twitchUserId;
             if (FailChannel) throw new HttpRequestException("down");
-            return Task.FromResult<IReadOnlyList<SevenTvEmote>>(Channel);
+            return Task.FromResult<IReadOnlyList<ExtraEmote>>(Channel);
         }
     }
 
@@ -248,10 +248,10 @@ public class SevenTvTests
     {
         var api = new FakeApi
         {
-            Global = { new SevenTvEmote("Same", "https://g/global.gif", true), new SevenTvEmote("OnlyGlobal", "https://g/og.png", false) },
-            Channel = { new SevenTvEmote("Same", "https://c/channel.gif", true) },
+            Global = { new ExtraEmote("Same", "https://g/global.gif", true), new ExtraEmote("OnlyGlobal", "https://g/og.png", false) },
+            Channel = { new ExtraEmote("Same", "https://c/channel.gif", true) },
         };
-        var catalog = new SevenTvCatalog(api, () => "777");
+        var catalog = new ExtraEmoteCatalog(api, () => "777");
 
         await catalog.EnsureLoadedAsync();
 
@@ -266,8 +266,8 @@ public class SevenTvTests
     [Fact]
     public async Task One_half_failing_still_gives_the_other_half_and_the_next_try_waits()
     {
-        var api = new FakeApi { Global = { new SevenTvEmote("G", "https://g/g.png", false) }, FailChannel = true };
-        var catalog = new SevenTvCatalog(api, () => "777");
+        var api = new FakeApi { Global = { new ExtraEmote("G", "https://g/g.png", false) }, FailChannel = true };
+        var catalog = new ExtraEmoteCatalog(api, () => "777");
 
         await catalog.EnsureLoadedAsync();
         await catalog.EnsureLoadedAsync();
@@ -280,7 +280,7 @@ public class SevenTvTests
     public async Task Nothing_loaded_and_everything_failing_leaves_an_empty_catalog_without_an_error()
     {
         var api = new FakeApi { FailGlobal = true, FailChannel = true };
-        var catalog = new SevenTvCatalog(api, () => "777");
+        var catalog = new ExtraEmoteCatalog(api, () => "777");
 
         await catalog.EnsureLoadedAsync();
 
@@ -369,10 +369,10 @@ public class ChatEmoteMessageTests
     [Fact]
     public async Task Words_of_the_catalog_in_a_message_become_pieces_with_an_address_and_the_rest_stays_text()
     {
-        var api = new SevenTvTests_Api(new SevenTvEmote("furaNEGNORb", "https://cdn/fura.gif", true));
-        var catalog = new SevenTvCatalog(api, () => "777");
+        var api = new SevenTvTests_Api(new ExtraEmote("furaNEGNORb", "https://cdn/fura.gif", true));
+        var catalog = new ExtraEmoteCatalog(api, () => "777");
         await catalog.EnsureLoadedAsync();
-        var emotes = new ChatEmotes(catalog, new EmoteImageCache(new System.Net.Http.HttpClient()), TwitchEndpoints.Default);
+        var emotes = new ChatEmotes(catalog, new ImageCache(new System.Net.Http.HttpClient()), TwitchEndpoints.Default);
         var message = new ChatMessage("m", "42", "v", "V", "hello furaNEGNORb furaNEGNORb bye", Array.Empty<ChatMention>(), DateTime.UtcNow);
 
         var pieces = emotes.Pieces(message);
@@ -386,10 +386,10 @@ public class ChatEmoteMessageTests
     [Fact]
     public async Task Twitch_emotes_in_the_fragments_are_pieces_too_and_a_word_inside_a_text_fragment_is_still_looked_up()
     {
-        var api = new SevenTvTests_Api(new SevenTvEmote("Seven", "https://cdn/seven.png", false));
-        var catalog = new SevenTvCatalog(api, () => "777");
+        var api = new SevenTvTests_Api(new ExtraEmote("Seven", "https://cdn/seven.png", false));
+        var catalog = new ExtraEmoteCatalog(api, () => "777");
         await catalog.EnsureLoadedAsync();
-        var emotes = new ChatEmotes(catalog, new EmoteImageCache(new System.Net.Http.HttpClient()), TwitchEndpoints.Default);
+        var emotes = new ChatEmotes(catalog, new ImageCache(new System.Net.Http.HttpClient()), TwitchEndpoints.Default);
         var message = new ChatMessage("m", "42", "v", "V", "Kappa Seven", Array.Empty<ChatMention>(), DateTime.UtcNow, Fragments: new[]
         {
             new ChatFragment("emote", "Kappa", "25", false),
@@ -403,11 +403,11 @@ public class ChatEmoteMessageTests
             pieces.Select(p => (p.Text, p.Url)).ToArray());
     }
 
-    private sealed class SevenTvTests_Api : ISevenTvApi
+    private sealed class SevenTvTests_Api : IExtraEmoteApi
     {
-        private readonly SevenTvEmote[] _emotes;
-        public SevenTvTests_Api(params SevenTvEmote[] emotes) => _emotes = emotes;
-        public Task<IReadOnlyList<SevenTvEmote>> GetGlobalAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<SevenTvEmote>>(_emotes);
-        public Task<IReadOnlyList<SevenTvEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct) => Task.FromResult<IReadOnlyList<SevenTvEmote>>(Array.Empty<SevenTvEmote>());
+        private readonly ExtraEmote[] _emotes;
+        public SevenTvTests_Api(params ExtraEmote[] emotes) => _emotes = emotes;
+        public Task<IReadOnlyList<ExtraEmote>> GetGlobalAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ExtraEmote>>(_emotes);
+        public Task<IReadOnlyList<ExtraEmote>> GetChannelAsync(string twitchUserId, CancellationToken ct) => Task.FromResult<IReadOnlyList<ExtraEmote>>(Array.Empty<ExtraEmote>());
     }
 }
