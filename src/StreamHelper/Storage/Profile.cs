@@ -114,6 +114,8 @@ public static class Profile
         nameof(AppSettings.ChatOutlineOpacity),
         nameof(AppSettings.ChatFontSize),
         nameof(AppSettings.ChatMuteMinutes),
+        nameof(AppSettings.ChatShowViewers),
+        nameof(AppSettings.ChatLinkPreviews),
         nameof(AppSettings.ChatLeft),
         nameof(AppSettings.ChatTop),
         nameof(AppSettings.ChatWidth),

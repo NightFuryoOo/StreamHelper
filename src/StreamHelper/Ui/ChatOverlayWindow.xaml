@@ -142,6 +142,11 @@
             </Setter>
         </Style>
     </Window.Resources>
+    <Grid>
+    <Grid.RowDefinitions>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
     <Border x:Name="Panel" CornerRadius="10" BorderThickness="2" BorderBrush="Transparent" ClipToBounds="True">
         <Border.Background>
             <SolidColorBrush x:Name="PanelBrush" Color="#101217" Opacity="0.6"/>
@@ -278,4 +283,17 @@
                    Cursor="SizeNWSE" AutomationProperties.Name="Растянуть за правый нижний угол"/>
         </Grid>
     </Border>
+    <Border x:Name="ViewersStrip" Grid.Row="1" HorizontalAlignment="Left" Margin="12,3,10,3" Visibility="Collapsed" ToolTip="В эфире">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="0" Opacity="0.9"/>
+        </Border.Effect>
+        <StackPanel Orientation="Horizontal">
+            <Viewbox x:Name="ViewersIcon" Width="14" Height="14" VerticalAlignment="Center" Margin="0,1,5,0"/>
+            <ui:RollingNumber x:Name="ViewersCount" TextElement.FontSize="12" TextElement.FontWeight="SemiBold"
+                              TextElement.Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ViewersDelta" FontSize="12" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center"
+                       Visibility="Collapsed"/>
+        </StackPanel>
+    </Border>
+    </Grid>
 </Window>

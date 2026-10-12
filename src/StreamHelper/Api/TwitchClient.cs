@@ -26,30 +26,34 @@ public sealed record TwitchEndpoints(
         "https://api.twitch.tv/helix/eventsub/subscriptions",
         "https://api.twitch.tv/helix/channel_points/custom_rewards");
 
-    public string ChatBadgesUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/badges";
+    private string Helix(string path) => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/" + path;
 
-    public string EmoteUrl(string id, bool animated) =>
-        $"{EmotesBase}/{Uri.EscapeDataString(id)}/{(animated ? "animated" : "static")}/dark/2.0";
+    public string ChatBadgesUrl => Helix("chat/badges");
 
-    public string StreamsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/streams";
+    public string EmoteUrl(string id, bool animated, bool giant = false) =>
+        $"{EmotesBase}/{Uri.EscapeDataString(id)}/{(animated ? "animated" : "static")}/dark/{(giant ? "3.0" : "2.0")}";
 
-    public string ModerationBansUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/bans";
+    public string StreamsUrl => Helix("streams");
 
-    public string PollsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/polls";
+    public string ClipsUrl => Helix("clips");
 
-    public string PredictionsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/predictions";
+    public string ModerationBansUrl => Helix("moderation/bans");
 
-    public string ShoutoutsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/shoutouts";
+    public string PollsUrl => Helix("polls");
 
-    public string ModeratedChannelsUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/channels";
+    public string PredictionsUrl => Helix("predictions");
 
-    public string ChatChattersUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/chatters";
+    public string ShoutoutsUrl => Helix("chat/shoutouts");
 
-    public string ChatEmotesUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/emotes";
+    public string ModeratedChannelsUrl => Helix("moderation/channels");
 
-    public string ChatMessagesUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/chat/messages";
+    public string ChatChattersUrl => Helix("chat/chatters");
 
-    public string ModerationChatUrl => UsersUrl[..UsersUrl.LastIndexOf("/helix/users", StringComparison.Ordinal)] + "/helix/moderation/chat";
+    public string ChatEmotesUrl => Helix("chat/emotes");
+
+    public string ChatMessagesUrl => Helix("chat/messages");
+
+    public string ModerationChatUrl => Helix("moderation/chat");
 
     public static TwitchEndpoints FromBase(string baseUrl)
     {
@@ -85,7 +89,12 @@ public interface IFollowerSource
 
 public sealed record LiveStream(string UserId, string Login, string Game, string Title, int Viewers, DateTime? StartedUtc);
 
-public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi, IVoteApi, IChatSendApi, IEmoteApi, IChattersApi
+public interface ILiveStreamApi
+{
+    Task<IReadOnlyList<LiveStream>> GetLiveStreamsAsync(IReadOnlyList<string> userIds, CancellationToken ct);
+}
+
+public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewardApi, IBadgeApi, IModerationApi, IStreamApi, IVoteApi, IChatSendApi, IEmoteApi, IChattersApi, ILiveStreamApi, IClipApi
 {
     public const string FollowerScope = "moderator:read:followers";
     public const string SubscriptionScope = "channel:read:subscriptions";
@@ -235,6 +244,17 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
             live.AddRange(ParseLiveStreams(body));
         }
         return live;
+    }
+
+    public async Task<LinkPreview?> GetClipAsync(string slug, CancellationToken ct)
+    {
+        var url = _endpoints.ClipsUrl + "?id=" + Uri.EscapeDataString(slug);
+        var (status, body) = await CallWithRefreshAsync((token, c) => GetAsync(url, token, c), ct);
+        ThrowIfUnauthorized(status, "Twitch не отдал клип: переподключи Twitch.");
+        if (status == (HttpStatusCode)429) throw new HttpRequestException("Twitch: слишком много запросов (HTTP 429).");
+        if (status is HttpStatusCode.BadRequest or HttpStatusCode.NotFound) return null;
+        if (status != HttpStatusCode.OK) throw new HttpRequestException($"Twitch: HTTP {(int)status}.");
+        return PreviewLinks.ParseClip(body);
     }
 
     public static IReadOnlyList<LiveStream> ParseLiveStreams(string json)

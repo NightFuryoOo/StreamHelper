@@ -71,26 +71,6 @@ public class EmoteInputTests
         Assert.Equal(6, caret);
     }
 
-    private static void Sta(Action body)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                body();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-    }
-
     private static void Type(EmoteTextBox box, string text)
     {
         foreach (var c in text)
@@ -114,7 +94,7 @@ public class EmoteInputTests
     [Fact]
     public void The_box_shows_codes_as_pictures_but_its_text_keeps_the_codes()
     {
-        Sta(() =>
+        Sta.Run(() =>
         {
             var box = Box();
             box.SetText("hi furaSHTUKNOST furaSHTUKNOST", 30);
@@ -127,7 +107,7 @@ public class EmoteInputTests
     [Fact]
     public void The_caret_counts_a_picture_as_its_code()
     {
-        Sta(() =>
+        Sta.Run(() =>
         {
             var box = Box();
             box.SetText("a Kappa b", 0);
@@ -144,7 +124,7 @@ public class EmoteInputTests
     [Fact]
     public void Typing_a_code_turns_it_into_a_picture_once_a_space_is_typed()
     {
-        Sta(() =>
+        Sta.Run(() =>
         {
             var box = Box();
             box.SetText("hi ", 3);
@@ -161,7 +141,7 @@ public class EmoteInputTests
     [Fact]
     public void Pasted_and_selected_text_goes_through_the_same_rules()
     {
-        Sta(() =>
+        Sta.Run(() =>
         {
             var box = Box();
             box.MaxLength = 12;

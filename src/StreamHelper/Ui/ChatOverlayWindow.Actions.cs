@@ -376,6 +376,7 @@ public partial class ChatOverlayWindow
             if (!ReferenceEquals(inline, line.Status)) inline.TextDecorations = TextDecorations.Strikethrough;
         }
         line.Text.Opacity = 0.55;
+        if (line.Card != null) line.Card.Root.Opacity = 0.55;
         if (line.Removed != null) return;
         line.Removed = new Run("  · удалено") { Foreground = DoneBrush, FontSize = line.Text.FontSize * 0.9 };
         line.Text.Inlines.Add(line.Removed);

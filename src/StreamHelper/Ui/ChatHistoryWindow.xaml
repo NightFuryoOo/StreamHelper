@@ -18,7 +18,7 @@
             <TextBlock x:Name="CountText" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0"/>
         </StackPanel>
 
-        <RichTextBox x:Name="Box" Grid.Row="1" Margin="0,12,0,0" IsReadOnly="True" IsDocumentEnabled="True"
+        <RichTextBox x:Name="Box" Grid.Row="1" Margin="0,12,0,0" IsReadOnly="True" IsDocumentEnabled="True" IsUndoEnabled="False"
                      Background="#262A33" BorderBrush="#3A3F4B" Foreground="{StaticResource TextBrush}" Padding="8,6"
                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                      AutomationProperties.Name="Сообщения"/>

@@ -161,6 +161,10 @@ public partial class App : Application
                 ("FFZ", new FfzClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_FFZ_URL")))),
             () => settings.Current.ChannelId);
         var images = new ImageCache(_http);
+        var previews = new LinkPreviewCatalog(
+            twitch,
+            new YouTubeClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_YOUTUBE_URL"), Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL")),
+            images);
         var emotes = new ChatEmotes(extraEmotes, images, twitchEndpoints, new EmoteLibrary(twitch, extraEmotes, settings, twitchEndpoints));
         var votes = new VoteWatcher(settings, twitch);
 
@@ -179,7 +183,7 @@ public partial class App : Application
             Hotkey = new HotkeyService(),
             Toasts = new ToastService(settings),
             ChatFeed = chatFeed,
-            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch, twitch),
+            Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch, twitch, twitch, previews),
             Votes = votes,
             RewardAlert = new RewardAlertService(settings),
             RewardMute = new RewardMuteSwitch(settings, twitch),

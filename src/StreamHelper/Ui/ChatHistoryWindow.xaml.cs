@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Navigation;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Storage;
@@ -38,7 +38,6 @@ public partial class ChatHistoryWindow : Window
     private readonly ChatEmotes _emotes;
     private readonly IModerationApi _moderation;
     private readonly EmoteAnimator _animator = new(200);
-    private readonly List<ChatMessage> _messages = new();
     private readonly string _key;
     private readonly DateTime? _sinceUtc;
     private readonly HashSet<string> _seen = new();
@@ -50,16 +49,27 @@ public partial class ChatHistoryWindow : Window
     private readonly DispatcherTimer _disarm = new() { Interval = ConfirmWindow };
     private string? _armed;
     private readonly bool _canDelete;
+    private readonly LinkPreviewCatalog? _previews;
+    private readonly Func<bool> _previewsOn;
     private int _count;
 
-    public ChatHistoryWindow(ChatFeed feed, ChatMessage sample, DateTime? sinceUtc, ChatEmotes emotes, IModerationApi moderation, bool canDelete = true)
+    public ChatHistoryWindow(
+        ChatFeed feed, ChatMessage sample, DateTime? sinceUtc, ChatEmotes emotes, IModerationApi moderation, bool canDelete = true,
+        LinkPreviewCatalog? previews = null, Func<bool>? previewsOn = null)
     {
         InitializeComponent();
         _canDelete = canDelete;
+        _previews = previews;
+        _previewsOn = previewsOn ?? (() => true);
         _feed = feed;
         _emotes = emotes;
         _moderation = moderation;
         _disarm.Tick += (_, _) => Disarm();
+        Box.AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler((_, e) =>
+        {
+            e.Handled = true;
+            BrowserLauncher.Open(e.Uri.AbsoluteUri);
+        }));
         _key = ChatFeed.KeyOf(sample);
         _sinceUtc = sinceUtc;
 
@@ -85,7 +95,6 @@ public partial class ChatHistoryWindow : Window
             Activate();
             NativeMethods.SetForegroundWindow(new System.Windows.Interop.WindowInteropHelper(this).Handle);
             Box.ScrollToEnd();
-            _ = LoadEmotesAsync();
         };
     }
 
@@ -110,8 +119,9 @@ public partial class ChatHistoryWindow : Window
         if (_sinceUtc != null && message.AtUtc < _sinceUtc) return;
         Dispatcher.InvokeAsync(async () =>
         {
-            await _emotes.PreloadAsync(new[] { message }, EmoteWait);
-            var atEnd = Box.VerticalOffset + Box.ViewportHeight >= Box.ExtentHeight - 4;
+            var target = PreviewOf(message);
+            await Task.WhenAll(_emotes.PreloadAsync(message, EmoteWait), target == null ? Task.CompletedTask : Task.WhenAny(_previews!.LoadAsync(target), Task.Delay(EmoteWait)));
+            var atEnd = AtEnd();
             if (!Append(message)) return;
             UpdateCount();
             if (atEnd) Box.ScrollToEnd();
@@ -121,7 +131,6 @@ public partial class ChatHistoryWindow : Window
     private bool Append(ChatMessage message)
     {
         if (message.MessageId.Length > 0 && !_seen.Add(message.MessageId)) return false;
-        _messages.Add(message);
         if (message.MessageId.Length > 0) _byId[message.MessageId] = message;
         Box.Document.Blocks.Add(BuildParagraph(message));
         _count++;
@@ -165,8 +174,49 @@ public partial class ChatHistoryWindow : Window
         if (deleted) paragraph.Inlines.Add(new Run("  · удалено") { Foreground = DoneBrush, FontSize = 12 });
         else if (CanDelete(message)) AddTrash(paragraph, message);
         if (_errors.TryGetValue(id, out var error)) paragraph.Inlines.Add(new Run("  " + error) { Foreground = ErrorBrush, FontSize = 12 });
-        if (id.Length > 0) _paragraphs[id] = paragraph;
+        AddPreview(paragraph, message, deleted);
+        if (id.Length > 0)
+        {
+            _paragraphs[id] = paragraph;
+            if (!_emotes.IsComplete(message)) _ = FillLateEmotesAsync(message);
+        }
         return paragraph;
+    }
+
+    private PreviewTarget? PreviewOf(ChatMessage message) =>
+        _previews != null && _previewsOn() ? LinkPreviewCatalog.TargetOf(message) : null;
+
+    private void AddPreview(Paragraph paragraph, ChatMessage message, bool deleted)
+    {
+        if (PreviewOf(message) is not { } target) return;
+        if (_previews!.Get(target) is { } preview)
+        {
+            if (LinkCard.TryCreate(preview, _previews.Thumbnail(preview), target.Url, TextSize, BrowserLauncher.Open) is not { } card) return;
+            if (deleted) card.Root.Opacity = 0.55;
+            paragraph.Inlines.Add(new LineBreak());
+            paragraph.Inlines.Add(new InlineUIContainer(card.Root) { BaselineAlignment = BaselineAlignment.Top });
+        }
+        else if (message.MessageId.Length > 0 && !_previews.IsSettled(target)) _ = FillLatePreviewAsync(message, target);
+    }
+
+    private async Task FillLatePreviewAsync(ChatMessage message, PreviewTarget target)
+    {
+        if (await _previews!.LoadAsync(target) == null) return;
+        var atEnd = AtEnd();
+        Refresh(message);
+        if (atEnd) Box.ScrollToEnd();
+    }
+
+    private bool AtEnd() => Box.VerticalOffset + Box.ViewportHeight >= Box.ExtentHeight - 4;
+
+    private async Task FillLateEmotesAsync(ChatMessage message)
+    {
+        var shown = _emotes.Shown(message);
+        await _emotes.CompleteAsync(message);
+        if (_emotes.Shown(message) <= shown) return;
+        var atEnd = AtEnd();
+        Refresh(message);
+        if (atEnd) Box.ScrollToEnd();
     }
 
     private void AddTrash(Paragraph paragraph, ChatMessage message)
@@ -287,22 +337,6 @@ public partial class ChatHistoryWindow : Window
         template.Seal();
         _trashTemplate = template;
         return template;
-    }
-
-    private async Task LoadEmotesAsync()
-    {
-        if (_emotes.Missing(_messages).Count == 0) return;
-        await _emotes.PreloadAsync(_messages.ToList(), EmoteWait);
-        var atEnd = Box.VerticalOffset + Box.ViewportHeight >= Box.ExtentHeight - 4;
-        var offset = Box.VerticalOffset;
-        _animator.Clear();
-        _paragraphs.Clear();
-        _trash.Clear();
-        Box.Document.Blocks.Clear();
-        foreach (var message in _messages) Box.Document.Blocks.Add(BuildParagraph(message));
-        Box.UpdateLayout();
-        if (atEnd) Box.ScrollToEnd();
-        else Box.ScrollToVerticalOffset(offset);
     }
 
     private void UpdateCount()

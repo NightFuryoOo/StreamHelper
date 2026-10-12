@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using StreamHelper.Api;
+using StreamHelper.Models;
 
 namespace StreamHelper.Ui;
 
@@ -8,13 +9,11 @@ public static class ChannelLive
 {
     private static readonly CultureInfo Russian = CultureInfo.GetCultureInfo("ru-RU");
 
-    public static string Viewers(int count)
-    {
-        var tens = count % 100;
-        var ones = count % 10;
-        var word = tens is >= 11 and <= 14 ? "зрителей" : ones == 1 ? "зритель" : ones is >= 2 and <= 4 ? "зрителя" : "зрителей";
-        return count.ToString("N0", Russian) + " " + word;
-    }
+    public static string Viewers(int count) => Count(count) + " " + Words.Plural(count, "зритель", "зрителя", "зрителей");
+
+    public static string Count(int count) => count.ToString("N0", Russian);
+
+    public static string Change(int delta) => delta == 0 ? "" : (delta > 0 ? "+" : "−") + Count(Math.Abs(delta));
 
     public static string Duration(TimeSpan length)
     {

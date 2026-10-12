@@ -25,6 +25,19 @@ public class ChannelLiveTests
     public void Big_numbers_are_split_into_groups()
     {
         Assert.Equal("1 234 зрителя", ChannelLive.Viewers(1234));
+        Assert.Equal("1 234", ChannelLive.Count(1234));
+        Assert.Equal("5", ChannelLive.Count(5));
+    }
+
+    [Theory]
+    [InlineData(16, "+16")]
+    [InlineData(-263, "−263")]
+    [InlineData(1500, "+1 500")]
+    [InlineData(-2000, "−2 000")]
+    [InlineData(0, "")]
+    public void The_change_since_the_last_update_has_its_sign(int delta, string expected)
+    {
+        Assert.Equal(expected, ChannelLive.Change(delta));
     }
 
     [Theory]

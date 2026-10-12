@@ -19,6 +19,24 @@ public partial class SettingsWindow
         ChatMuteText.Text = ChatPlacement.DescribeDuration(muteMinutes * 60);
         ChatAppearSlider.Value = ChatPlacement.ClampAppearMs(settings.ChatAppearMs);
         ChatAppearText.Text = ChatPlacement.DescribeAppear(ChatPlacement.ClampAppearMs(settings.ChatAppearMs));
+        ChatViewersCheck.IsChecked = settings.ChatShowViewers;
+        ChatPreviewsCheck.IsChecked = settings.ChatLinkPreviews;
+    }
+
+    private void OnChatPreviewsClick(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ChatLinkPreviews = ChatPreviewsCheck.IsChecked == true;
+        _services.Settings.Save();
+        _services.Chat.Apply();
+    }
+
+    private void OnChatViewersClick(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ChatShowViewers = ChatViewersCheck.IsChecked == true;
+        _services.Settings.Save();
+        _services.Chat.RefreshViewers();
     }
 
     private void ApplyChatStatus(SyncStatus status)

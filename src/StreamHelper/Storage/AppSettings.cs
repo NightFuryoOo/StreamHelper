@@ -260,6 +260,8 @@ public sealed class AppSettings
     public double ChatFontSize { get; set; } = 14;
 
     public int ChatMuteMinutes { get; set; } = 10;
+    public bool ChatShowViewers { get; set; } = true;
+    public bool ChatLinkPreviews { get; set; } = true;
     public double? ChatLeft { get; set; }
     public double? ChatTop { get; set; }
     public double? ChatWidth { get; set; }

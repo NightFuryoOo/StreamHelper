@@ -9,6 +9,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Navigation;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Storage;
@@ -68,11 +69,12 @@ public partial class ChatOverlayWindow : Window
 
     public ChatOverlayWindow(
         SettingsStore settings, ChatBadgeCatalog badges, IModerationApi moderation, ChatEmotes emotes, IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend,
-        ChatterDirectory? present = null)
+        ChatterDirectory? present = null, LinkPreviewCatalog? previews = null)
     {
         InitializeComponent();
         _settings = settings;
         _present = present;
+        _previews = previews;
         _badges = badges;
         _moderation = moderation;
         _emotes = emotes;
@@ -90,11 +92,13 @@ public partial class ChatOverlayWindow : Window
         _idle.Tick += (_, _) => SetInteractive(false);
         PreviewMouseMove += (_, _) => RestartIdle();
         PreviewMouseDown += (_, _) => RestartIdle();
+        AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler(OnLinkClicked));
         PreviewMouseWheel += OnChatWheel;
         Lines.SizeChanged += (_, _) => SetScroll(_scroll);
         Viewport.SizeChanged += (_, _) => SetScroll(_scroll);
         InitVotes(votes, watcher);
         InitCompose(chatSend);
+        InitViewers();
         ApplyAppearance();
         MoveToConfiguredPlace();
     }
@@ -110,6 +114,13 @@ public partial class ChatOverlayWindow : Window
         base.OnSourceInitialized(e);
         _handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
         NativeMethods.AddExStyle(_handle, NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow | NativeMethods.WsExTransparent);
+    }
+
+    private void OnLinkClicked(object sender, RequestNavigateEventArgs e)
+    {
+        e.Handled = true;
+        if (!_interactive || _positioning) return;
+        BrowserLauncher.Open(e.Uri.AbsoluteUri);
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
@@ -274,6 +285,8 @@ public partial class ChatOverlayWindow : Window
         _cellLine.Opacity = ChatPlacement.ClampOutlineOpacity(settings.ChatOutlineOpacity);
         ApplyPingBrushes();
         var size = ChatPlacement.ClampFontSize(settings.ChatFontSize);
+        ApplyViewersSize(size);
+        ApplyPreviews(size);
         foreach (var line in _lines)
         {
             line.Box.Background = PlateFor(line.Message);
@@ -284,7 +297,7 @@ public partial class ChatOverlayWindow : Window
             foreach (var inline in line.Text.Inlines)
             {
                 if (inline is not InlineUIContainer { Child: Image image }) continue;
-                if (image.Tag as string == ChatEmotes.ImageTag) image.Height = ChatEmotes.HeightFor(size);
+                if (ChatEmotes.IsEmote(image.Tag)) image.Height = ChatEmotes.HeightFor(size, image.Tag);
                 else image.Height = image.Width = BadgeSize(size);
             }
             line.Mute?.Rename(MuteName());
@@ -346,7 +359,8 @@ public partial class ChatOverlayWindow : Window
             }
             while (_pending.Count > 0 && !Paused)
             {
-                await _emotes.PreloadAsync(_pending.Peek());
+                var next = _pending.Peek();
+                await Task.WhenAll(_emotes.PreloadAsync(next), PreloadPreviewAsync(next));
                 if (Paused) break;
                 Render(_pending.Dequeue());
             }
@@ -376,12 +390,15 @@ public partial class ChatOverlayWindow : Window
         var nickBrush = Frozen(new SolidColorBrush(Color.FromRgb(r, g, b)));
         text.Inlines.Add(new Run(name) { FontWeight = FontWeights.Bold, Foreground = nickBrush });
         text.Inlines.Add(new Run(": "));
-        foreach (var inline in _emotes.Inlines(message, size)) text.Inlines.Add(inline);
+        var content = _emotes.Inlines(message, size);
+        foreach (var inline in content) text.Inlines.Add(inline);
 
         var root = new Grid { Background = Brushes.Transparent };
         var reply = message.Reply is { } parent ? ReplyLine(parent, size) : null;
-        if (reply == null) root.Children.Add(text);
-        else root.Children.Add(new StackPanel { Children = { reply, text } });
+        var body = new StackPanel();
+        if (reply != null) body.Children.Add(reply);
+        body.Children.Add(text);
+        root.Children.Add(body);
         var box = new Border
         {
             Child = root,
@@ -391,7 +408,7 @@ public partial class ChatOverlayWindow : Window
             Padding = new Thickness(6, 2, 6, 2),
             Margin = new Thickness(0, 0, 0, 2),
         };
-        var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply };
+        var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply, Content = content, Body = body };
         if (CanModerate(message)) AddActions(line);
         box.MouseRightButtonUp += (_, e) =>
         {
@@ -419,6 +436,21 @@ public partial class ChatOverlayWindow : Window
             Lines.Children.RemoveAt(0);
             _lines.RemoveAt(0);
         }
+        if (!_emotes.IsComplete(message)) _ = FillLateEmotesAsync(line);
+        ShowPreview(line);
+    }
+
+    private async Task FillLateEmotesAsync(ChatLine line)
+    {
+        var shown = _emotes.Shown(line.Message);
+        await _emotes.CompleteAsync(line.Message);
+        if (_emotes.Shown(line.Message) <= shown || !_lines.Contains(line) || line.Content.Count == 0) return;
+        var fresh = _emotes.Inlines(line.Message, ChatPlacement.ClampFontSize(_settings.Current.ChatFontSize));
+        var anchor = line.Content[0];
+        foreach (var inline in fresh) line.Text.Inlines.InsertBefore(anchor, inline);
+        foreach (var old in line.Content) line.Text.Inlines.Remove(old);
+        line.Content = fresh;
+        if (_deletedIds.Contains(line.Message.MessageId)) MarkDeleted(line);
     }
 
     public static double ReplySize(double size) => Math.Round(size * 0.85, 1);
@@ -495,6 +527,9 @@ public partial class ChatOverlayWindow : Window
         public Border Box { get; }
         public TextBlock Text { get; }
         public TextBlock? Reply { get; init; }
+        public List<Inline> Content { get; set; } = new();
+        public StackPanel Body { get; init; } = new();
+        public LinkCard? Card { get; set; }
         public Brush NickBrush { get; }
         public Border? Actions { get; set; }
         public IconButton? Mute { get; set; }

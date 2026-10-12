@@ -154,30 +154,10 @@ public class HotkeyServiceTests
     private static void Press(HotkeyService service, HotkeyAction action) =>
         SendMessage(service.Handle, WmHotkey, (IntPtr)HotkeyService.IdOf(action), IntPtr.Zero);
 
-    private static void OnUiThread(Action body)
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                body();
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-    }
-
     [Fact]
     public void Each_action_reports_itself_when_its_key_is_pressed()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             var pressed = new List<HotkeyAction>();
@@ -196,7 +176,7 @@ public class HotkeyServiceTests
     [Fact]
     public void A_combination_cannot_be_registered_twice_until_the_first_is_released()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             Assert.True(service.Register(HotkeyAction.Donations, All4, 0x7E));
@@ -213,7 +193,7 @@ public class HotkeyServiceTests
     [Fact]
     public void Registering_all_skips_the_unset_ones_and_names_the_ones_that_failed()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             var settings = new AppSettings();
@@ -234,7 +214,7 @@ public class HotkeyServiceTests
     [Fact]
     public void Clearing_a_binding_and_registering_again_releases_it()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             var settings = new AppSettings();
@@ -252,7 +232,7 @@ public class HotkeyServiceTests
     [Fact]
     public void Disposing_releases_every_key()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             var first = new HotkeyService();
             Assert.True(first.Register(HotkeyAction.Donations, All4, 0x82));
@@ -275,7 +255,7 @@ public class HotkeyServiceTests
     [Fact]
     public void A_reward_key_reports_its_reward_when_pressed()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             var settings = WithSounds("reward-a", "reward-b");
@@ -298,7 +278,7 @@ public class HotkeyServiceTests
     [Fact]
     public void A_reward_key_taken_by_another_program_is_named_and_the_others_still_work()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var other = new HotkeyService();
             Assert.True(other.Register(HotkeyAction.Donations, All4, 0x86));
@@ -319,7 +299,7 @@ public class HotkeyServiceTests
     [Fact]
     public void Releasing_all_keys_also_releases_the_reward_keys_and_a_removed_sound_loses_its_key()
     {
-        OnUiThread(() =>
+        Sta.Run(() =>
         {
             using var service = new HotkeyService();
             var settings = WithSounds("reward-a");

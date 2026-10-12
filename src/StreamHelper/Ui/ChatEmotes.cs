@@ -9,12 +9,15 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using StreamHelper.Api;
 using StreamHelper.Sync;
+using static StreamHelper.Ui.Freezables;
 
 namespace StreamHelper.Ui;
 
 public sealed class ChatEmotes
 {
     public const string ImageTag = "emote";
+    public const string GiantTag = "giant-emote";
+    private const double GiantScale = 4;
 
     private static readonly TimeSpan PreloadWait = TimeSpan.FromSeconds(3);
 
@@ -39,6 +42,10 @@ public sealed class ChatEmotes
 
     public static double HeightFor(double fontSize) => Math.Round(fontSize * 1.8);
 
+    public static double HeightFor(double fontSize, object? tag) => tag is GiantTag ? HeightFor(fontSize) * GiantScale : HeightFor(fontSize);
+
+    public static bool IsEmote(object? tag) => tag is ImageTag or GiantTag;
+
     public Task EnsureCatalogAsync() => _extra.EnsureLoadedAsync();
 
     public void ResetChannel()
@@ -47,9 +54,9 @@ public sealed class ChatEmotes
         Library?.Reset();
     }
 
-    public bool CatalogLoading => _extra.IsLoading;
+    public sealed record Piece(string Text, string? Url, bool Giant = false);
 
-    public sealed record Piece(string Text, string? Url);
+    private static bool IsTwitchEmote(ChatFragment fragment) => fragment.Type == "emote" && fragment.EmoteId.Length > 0;
 
     public IReadOnlyList<Piece> Pieces(ChatMessage message)
     {
@@ -63,12 +70,21 @@ public sealed class ChatEmotes
             text.Clear();
         }
 
-        foreach (var fragment in fragments)
+        var giant = -1;
+        if (message.GiantEmote)
         {
-            if (fragment.Type == "emote" && fragment.EmoteId.Length > 0)
+            for (var i = fragments.Count - 1; i >= 0 && giant < 0; i--)
+            {
+                if (IsTwitchEmote(fragments[i])) giant = i;
+            }
+        }
+        for (var i = 0; i < fragments.Count; i++)
+        {
+            var fragment = fragments[i];
+            if (IsTwitchEmote(fragment))
             {
                 Flush();
-                pieces.Add(new Piece(fragment.Text, _endpoints.EmoteUrl(fragment.EmoteId, fragment.Animated)));
+                pieces.Add(new Piece(fragment.Text, _endpoints.EmoteUrl(fragment.EmoteId, fragment.Animated, i == giant), i == giant));
                 continue;
             }
             foreach (var token in Split(fragment.Text))
@@ -99,29 +115,26 @@ public sealed class ChatEmotes
         }
     }
 
-    public async Task PreloadAsync(ChatMessage message)
+    public Task PreloadAsync(ChatMessage message) => PreloadAsync(message, PreloadWait);
+
+    public Task PreloadAsync(ChatMessage message, TimeSpan wait) => Task.WhenAny(CompleteAsync(message), Task.Delay(wait));
+
+    public async Task CompleteAsync(ChatMessage message)
     {
-        var work = PreloadCoreAsync(message);
-        await Task.WhenAny(work, Task.Delay(PreloadWait));
+        var loads = Urls(message).Select(_images.LoadAsync).ToList();
+        if (_extra.Count == 0)
+        {
+            await _extra.EnsureLoadedAsync();
+            loads.AddRange(Urls(message).Select(_images.LoadAsync));
+        }
+        await Task.WhenAll(loads);
     }
 
-    private async Task PreloadCoreAsync(ChatMessage message)
-    {
-        if (_extra.Count == 0) await _extra.EnsureLoadedAsync();
-        var urls = Pieces(message).Where(p => p.Url != null).Select(p => p.Url!).Distinct().ToList();
-        if (urls.Count > 0) await Task.WhenAll(urls.Select(u => _images.LoadAsync(u)));
-    }
+    public bool IsComplete(ChatMessage message) => (_extra.Count > 0 || !_extra.IsLoading) && Urls(message).All(url => _images.Get(url) != null);
 
-    public IReadOnlyList<string> Missing(IEnumerable<ChatMessage> messages) =>
-        messages.SelectMany(Pieces).Where(p => p.Url != null && _images.Get(p.Url) == null).Select(p => p.Url!).Distinct().ToList();
+    public int Shown(ChatMessage message) => Urls(message).Count(url => _images.Get(url) != null);
 
-    public async Task PreloadAsync(IEnumerable<ChatMessage> messages, TimeSpan wait)
-    {
-        var list = messages as IReadOnlyCollection<ChatMessage> ?? messages.ToList();
-        if (_extra.Count == 0) await Task.WhenAny(_extra.EnsureLoadedAsync(), Task.Delay(wait));
-        var urls = Missing(list);
-        if (urls.Count > 0) await Task.WhenAny(Task.WhenAll(urls.Select(u => _images.LoadAsync(u))), Task.Delay(wait));
-    }
+    private IEnumerable<string> Urls(ChatMessage message) => Pieces(message).Where(p => p.Url != null).Select(p => p.Url!).Distinct();
 
     public List<Inline> Inlines(ChatMessage message, double fontSize, EmoteAnimator? animator = null)
     {
@@ -131,23 +144,38 @@ public sealed class ChatEmotes
             var frames = piece.Url == null ? null : _images.Get(piece.Url);
             if (frames == null)
             {
-                inlines.Add(new Run(piece.Text));
+                AddText(inlines, piece.Text);
                 continue;
             }
-            inlines.Add(Picture(piece.Text, frames, fontSize, animator ?? _animator));
+            inlines.Add(Picture(piece.Text, frames, fontSize, piece.Giant ? GiantTag : ImageTag, animator ?? _animator));
         }
         return inlines;
     }
 
-    private static InlineUIContainer Picture(string name, EmoteFrames frames, double fontSize, EmoteAnimator animator)
+    private static readonly Brush LinkBrush = Solid(Color.FromRgb(0x6F, 0xB4, 0xFF));
+
+    private static void AddText(List<Inline> inlines, string text)
+    {
+        foreach (var part in ChatLinks.Split(text))
+        {
+            if (part.Link is not { } uri)
+            {
+                inlines.Add(new Run(part.Text));
+                continue;
+            }
+            inlines.Add(new Hyperlink(new Run(part.Text)) { NavigateUri = uri, Foreground = LinkBrush, ToolTip = uri.AbsoluteUri });
+        }
+    }
+
+    private static InlineUIContainer Picture(string name, EmoteFrames frames, double fontSize, string tag, EmoteAnimator animator)
     {
         var image = new Image
         {
             Source = frames.Frames[0],
-            Height = HeightFor(fontSize),
+            Height = HeightFor(fontSize, tag),
             Stretch = Stretch.Uniform,
             Margin = new Thickness(1, 0, 1, 0),
-            Tag = ImageTag,
+            Tag = tag,
             ToolTip = name,
         };
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);

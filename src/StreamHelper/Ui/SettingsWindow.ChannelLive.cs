@@ -17,7 +17,6 @@ namespace StreamHelper.Ui;
 public partial class SettingsWindow
 {
     private const double FaceSize = 18;
-    private static readonly Brush LiveBrush = MakeLiveBrush();
     private static readonly Brush DotRing = Solid(Color.FromRgb(0x1B, 0x1D, 0x23));
     private static readonly Brush FaceBack = Solid(Color.FromRgb(0x4A, 0x50, 0x60));
 
@@ -40,7 +39,7 @@ public partial class SettingsWindow
             {
                 Width = 9,
                 Height = 9,
-                Fill = LiveBrush,
+                Fill = LiveDot,
                 Stroke = DotRing,
                 StrokeThickness = 1.5,
                 HorizontalAlignment = HorizontalAlignment.Right,
@@ -108,21 +107,6 @@ public partial class SettingsWindow
             if (_faceUrls.TryGetValue(id, out var wanted) && wanted == url) ShowFace(id, avatar);
         }
     }
-
-    private static Brush MakeLiveBrush() =>
-        Frozen(new RadialGradientBrush
-        {
-            GradientOrigin = new Point(0.35, 0.3),
-            Center = new Point(0.45, 0.4),
-            RadiusX = 0.65,
-            RadiusY = 0.65,
-            GradientStops =
-            {
-                new GradientStop(Color.FromRgb(0xFF, 0x9A, 0x8F), 0),
-                new GradientStop(Color.FromRgb(0xEB, 0x04, 0x00), 0.55),
-                new GradientStop(Color.FromRgb(0xA8, 0x00, 0x00), 1),
-            },
-        });
 
     private void StartLiveWatch()
     {

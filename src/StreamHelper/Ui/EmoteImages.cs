@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -187,22 +188,52 @@ public sealed class ImageCache
 
     public ImageCache(HttpClient http) => _http = http;
 
-    private sealed record Entry(Task<EmoteFrames?> Task, DateTime StartedUtc);
+    private sealed class Entry
+    {
+        public Entry(Task<EmoteFrames?> task, long order)
+        {
+            Task = task;
+            StartedUtc = DateTime.UtcNow;
+            Used = order;
+        }
 
-    public EmoteFrames? Get(string url) =>
-        _entries.TryGetValue(url, out var entry) && entry.Task.IsCompletedSuccessfully ? entry.Task.Result : null;
+        public Task<EmoteFrames?> Task { get; }
+        public DateTime StartedUtc { get; }
+        public long Used { get; set; }
+    }
+
+    private long _clock;
+
+    public int Count => _entries.Count;
+
+    public EmoteFrames? Get(string url)
+    {
+        if (!_entries.TryGetValue(url, out var entry) || !entry.Task.IsCompletedSuccessfully) return null;
+        entry.Used = Interlocked.Increment(ref _clock);
+        return entry.Task.Result;
+    }
 
     public Task<EmoteFrames?> LoadAsync(string url)
     {
         if (_entries.TryGetValue(url, out var entry))
         {
             var failed = entry.Task.IsCompleted && (entry.Task.IsFaulted || entry.Task.Result == null);
-            if (!failed || DateTime.UtcNow - entry.StartedUtc < RetryAfter) return entry.Task;
+            if (!failed || DateTime.UtcNow - entry.StartedUtc < RetryAfter)
+            {
+                entry.Used = Interlocked.Increment(ref _clock);
+                return entry.Task;
+            }
         }
-        if (_entries.Count >= KeepAtMost) _entries.Clear();
-        var fresh = new Entry(FetchAsync(url), DateTime.UtcNow);
+        if (_entries.Count >= KeepAtMost) Trim();
+        var fresh = new Entry(FetchAsync(url), Interlocked.Increment(ref _clock));
         _entries[url] = fresh;
         return fresh.Task;
+    }
+
+    private void Trim()
+    {
+        var oldest = _entries.Where(pair => pair.Value.Task.IsCompleted).OrderBy(pair => pair.Value.Used).Take(_entries.Count - KeepAtMost * 3 / 4).ToList();
+        foreach (var pair in oldest) _entries.TryRemove(pair.Key, out _);
     }
 
     private async Task<EmoteFrames?> FetchAsync(string url)
@@ -216,7 +247,7 @@ public sealed class ImageCache
             if (bytes.Length > MaxBytes) return null;
             return await Task.Run(() => EmoteDecoder.Decode(bytes)).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException or IOException)
         {
             Log.Write("Picture failed: " + ex.Message);
             return null;

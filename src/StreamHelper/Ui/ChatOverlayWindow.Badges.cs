@@ -37,7 +37,7 @@ public partial class ChatOverlayWindow
         foreach (var line in _lines)
         {
             if (line.Message.Badges is not { Count: > 0 }) continue;
-            if (line.Text.Inlines.OfType<InlineUIContainer>().Any(i => i.Child is Image { Tag: not "emote" })) continue;
+            if (line.Text.Inlines.OfType<InlineUIContainer>().Any(i => i.Child is Image image && !ChatEmotes.IsEmote(image.Tag))) continue;
             var first = line.Text.Inlines.FirstInline;
             foreach (var badge in BadgeInlines(line.Message, line.Text.FontSize)) line.Text.Inlines.InsertBefore(first, badge);
         }

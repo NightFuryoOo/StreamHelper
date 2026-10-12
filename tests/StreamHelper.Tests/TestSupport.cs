@@ -14,6 +14,56 @@ internal static class TestEnvironment
         AppPaths.Init(Path.Combine(Path.GetTempPath(), "streamhelper-tests-logs"));
 }
 
+internal static class Sta
+{
+    public static void Run(Action body)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                body();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+}
+
+internal sealed class FakeWeb : HttpMessageHandler
+{
+    public static readonly byte[] Picture = TinyGif.Build(2, 2, new TinyGif.Frame(0, 0, 2, 2, new byte[] { 0, 1, 2, 0 }));
+
+    private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Func<Uri, bool> Held { get; init; } = _ => false;
+
+    public Func<Uri, (HttpStatusCode Status, string Body)?> Answer { get; set; } = _ => null;
+
+    public List<string> Asked { get; } = new();
+
+    public void Release() => _gate.TrySetResult();
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var uri = request.RequestUri!;
+        lock (Asked) Asked.Add(uri.PathAndQuery);
+        if (Held(uri)) await _gate.Task.WaitAsync(ct);
+        if (!uri.AbsolutePath.EndsWith(".jpg", StringComparison.Ordinal) && Answer(uri) is { } answer)
+        {
+            return new HttpResponseMessage(answer.Status) { Content = new StringContent(answer.Body) };
+        }
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Picture) };
+    }
+}
+
 internal sealed class TempDir : IDisposable
 {
     public TempDir()

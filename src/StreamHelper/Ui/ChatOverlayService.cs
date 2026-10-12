@@ -20,6 +20,9 @@ public sealed class ChatOverlayService : IPositionable
     private readonly VoteWatcher _watcher;
     private readonly IChatSendApi _chatSend;
     private readonly ChatterDirectory? _present;
+    private readonly ChatViewers? _viewers;
+    private readonly LinkPreviewCatalog? _previews;
+    private readonly System.Windows.Threading.DispatcherTimer _viewerTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private ChatOverlayWindow? _window;
     private ChatHistoryWindow? _history;
     private IntPtr _historyReturnTo;
@@ -27,9 +30,18 @@ public sealed class ChatOverlayService : IPositionable
 
     public ChatOverlayService(
         SettingsStore settings, ChatFeed feed, ChatBadgeCatalog badges, IModerationApi moderation, IStreamApi streams, ChatEmotes emotes,
-        IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend, IChattersApi? chatters = null)
+        IVoteApi votes, VoteWatcher watcher, IChatSendApi chatSend, IChattersApi? chatters = null, ILiveStreamApi? live = null,
+        LinkPreviewCatalog? previews = null)
     {
         _chatSend = chatSend;
+        _previews = previews;
+        if (live != null)
+        {
+            var viewers = new ChatViewers(live, () => settings.Current);
+            viewers.Changed += () => _window?.ShowViewers(viewers.Stream);
+            _viewerTimer.Tick += (_, _) => _ = viewers.RefreshAsync();
+            _viewers = viewers;
+        }
         if (chatters != null) _present = new ChatterDirectory(chatters, () => settings.Current.HasTwitchTokens && settings.Current.HasChattersScope && !settings.Current.IsViewerChannel);
         _votes = votes;
         _watcher = watcher;
@@ -61,13 +73,30 @@ public sealed class ChatOverlayService : IPositionable
             var window = EnsureWindow();
             window.ApplyAppearance();
             window.Present();
+            WatchViewers(true);
         }
         else
         {
             _window?.EndTyping(returnFocus: true);
             _window?.SetInteractive(false);
             _window?.FadeOut();
+            WatchViewers(false);
         }
+    }
+
+    public void RefreshViewers() => _ = _viewers?.RefreshAsync();
+
+    private void WatchViewers(bool shown)
+    {
+        if (_viewers == null) return;
+        if (!shown)
+        {
+            _viewerTimer.Stop();
+            return;
+        }
+        if (_viewerTimer.IsEnabled) return;
+        _viewerTimer.Start();
+        RefreshViewers();
     }
 
     public void ToggleVisible()
@@ -122,6 +151,8 @@ public sealed class ChatOverlayService : IPositionable
         _badges.Reset();
         _emotes.ResetChannel();
         _history?.Close();
+        _viewers?.Clear();
+        RefreshViewers();
         if (_window == null) return;
         _window.ResetChannel();
         _window.ShowVotes(null, null);
@@ -134,6 +165,7 @@ public sealed class ChatOverlayService : IPositionable
         _feed.Message -= OnMessage;
         _feed.Deleted -= OnDeleted;
         _watcher.Changed -= OnVotesChanged;
+        _viewerTimer.Stop();
         _history?.Close();
         _window?.Close();
         _window = null;
@@ -144,7 +176,7 @@ public sealed class ChatOverlayService : IPositionable
         if (_window != null) return _window;
         _ = _badges.EnsureLoadedAsync();
         _ = _emotes.EnsureCatalogAsync();
-        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend, _present);
+        var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend, _present, _previews);
         window.TypingChanged += typing => TypingChanged?.Invoke(typing);
         window.GeometryChanged += window.SaveGeometry;
         window.HistoryRequested += OnHistoryRequested;
@@ -156,6 +188,7 @@ public sealed class ChatOverlayService : IPositionable
             window.AddMessage(message);
         }
         window.ShowVotes(_watcher.Poll, _watcher.Prediction);
+        window.ShowViewers(_viewers?.Stream);
         return window;
     }
 
@@ -180,7 +213,8 @@ public sealed class ChatOverlayService : IPositionable
             old.Closed -= OnHistoryClosed;
             old.Close();
         }
-        var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel);
+        var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel,
+            _previews, () => _settings.Current.ChatLinkPreviews);
         window.Closed += OnHistoryClosed;
         _history = window;
         window.Show();

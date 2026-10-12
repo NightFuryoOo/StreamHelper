@@ -33,7 +33,7 @@ public sealed record ChatReply(string ParentMessageId, string ParentUserLogin, s
 public sealed record ChatMessage(
     string MessageId, string ChatterId, string ChatterLogin, string ChatterName, string Text,
     IReadOnlyList<ChatMention> Mentions, DateTime AtUtc, string Color = "", IReadOnlyList<ChatBadge>? Badges = null,
-    IReadOnlyList<ChatFragment>? Fragments = null, bool IsPing = false, ChatReply? Reply = null);
+    IReadOnlyList<ChatFragment>? Fragments = null, bool IsPing = false, ChatReply? Reply = null, bool GiantEmote = false);
 
 public enum ChatRemovalKind
 {
@@ -53,6 +53,7 @@ public static class EventSubParser
     public const string ChatDeleteType = "channel.chat.message_delete";
     public const string ChatClearUserType = "channel.chat.clear_user_messages";
     public const string ChatClearType = "channel.chat.clear";
+    public const string GiantEmoteKind = "power_ups_gigantified_emote";
 
     public static bool IsChatType(string type) =>
         type is ChatMessageType or ChatNoticeType or ChatDeleteType or ChatClearUserType or ChatClearType;
@@ -164,7 +165,8 @@ public static class EventSubParser
         return new ChatMessage(
             chatMessageId.Length > 0 ? chatMessageId : messageId,
             ReadString(ev, "chatter_user_id"), ReadString(ev, "chatter_user_login"), ReadString(ev, "chatter_user_name"),
-            text, mentions, messageAt, ReadString(ev, "color"), badges, parts.Count > 0 ? parts : null, Reply: reply);
+            text, mentions, messageAt, ReadString(ev, "color"), badges, parts.Count > 0 ? parts : null, Reply: reply,
+            GiantEmote: ReadString(ev, "message_type") == GiantEmoteKind);
     }
 
     private static ChatRemoval? BuildRemoval(string subscriptionType, JsonElement ev)

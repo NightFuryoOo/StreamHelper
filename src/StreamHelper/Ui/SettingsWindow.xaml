@@ -932,6 +932,16 @@
                                    Foreground="{StaticResource MutedBrush}"/>
                     </Grid>
 
+                    <CheckBox x:Name="ChatViewersCheck" Margin="0,16,0,0" AutomationProperties.Name="Показывать число зрителей под чатом"
+                              Click="OnChatViewersClick">
+                        <TextBlock TextWrapping="Wrap" Text="Показывать число зрителей под чатом"/>
+                    </CheckBox>
+
+                    <CheckBox x:Name="ChatPreviewsCheck" Margin="0,10,0,0" AutomationProperties.Name="Показывать превью клипов Twitch и видео YouTube"
+                              Click="OnChatPreviewsClick">
+                        <TextBlock TextWrapping="Wrap" Text="Показывать превью клипов Twitch и видео YouTube"/>
+                    </CheckBox>
+
                     <TextBlock x:Name="ChatModerationText" Foreground="{StaticResource WarnBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
                                Visibility="Collapsed" Text="Для бана и мута переподключи Twitch (вкладка «Twitch»): нужно новое право."/>
 

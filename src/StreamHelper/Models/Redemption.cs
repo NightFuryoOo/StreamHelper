@@ -176,11 +176,5 @@ public sealed class Redemption : ISeenItem, ISelectable
     private void Raise([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-    public static string FormatCost(long cost)
-    {
-        var mod100 = Math.Abs(cost) % 100;
-        var mod10 = mod100 % 10;
-        var word = mod100 is >= 11 and <= 14 ? "баллов" : mod10 == 1 ? "балл" : mod10 is >= 2 and <= 4 ? "балла" : "баллов";
-        return $"{cost.ToString("N0", Spaced)} {word}";
-    }
+    public static string FormatCost(long cost) => $"{cost.ToString("N0", Spaced)} {Words.Plural(cost, "балл", "балла", "баллов")}";
 }
