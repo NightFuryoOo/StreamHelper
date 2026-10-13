@@ -20,14 +20,17 @@ public sealed class RewardAlertService
 
     private readonly SettingsStore _settings;
     private readonly string _folder;
-    private readonly Dictionary<string, MediaPlayer> _playing = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Voice> _playing = new(StringComparer.Ordinal);
+    private readonly Stack<Voice> _idle = new();
 
     private const int WakeMs = 400;
     private const int KeepSilentMs = 3000;
     private const string SilenceFile = "_silence.wav";
     private MediaPlayer? _silent;
+    private bool _silentRunning;
     private long _silentReadyAt;
     private DispatcherTimer? _silentStop;
+    private DispatcherTimer? _grouping;
     private readonly Dictionary<string, DispatcherTimer> _starts = new(StringComparer.Ordinal);
 
     public RewardAlertService(SettingsStore settings, string? alertsFolder = null)
@@ -202,38 +205,82 @@ public sealed class RewardAlertService
 
     private bool Start(string rewardId, string path, double volume)
     {
-        var player = new MediaPlayer();
-        player.MediaOpened += (_, _) =>
-        {
-            if (!_playing.TryGetValue(rewardId, out var current) || !ReferenceEquals(current, player)) return;
-            player.Volume = volume;
-            player.Play();
-        };
-        player.MediaEnded += (_, _) =>
-        {
-            Log.Write("Reward alert ended.");
-            Release(rewardId, player);
-        };
-        player.MediaFailed += (_, e) =>
-        {
-            var reason = e.ErrorException?.Message ?? "неизвестная ошибка";
-            Log.Write("Reward alert failed: " + reason);
-            Failed?.Invoke("Не получилось проиграть этот файл: он повреждён или такой формат не поддерживается.");
-            Release(rewardId, player);
-        };
-        _playing[rewardId] = player;
+        var voice = _idle.Count > 0 ? _idle.Pop() : NewVoice();
+        voice.RewardId = rewardId;
+        voice.Volume = volume;
+        _playing[rewardId] = voice;
         try
         {
-            player.Open(new Uri(path));
+            voice.Player.Open(new Uri(path));
         }
         catch (Exception ex)
         {
             Log.Write("Reward alert failed: " + ex.Message);
             Failed?.Invoke("Не получилось проиграть: " + ex.Message);
-            Release(rewardId, player);
+            Release(rewardId, voice);
             return false;
         }
         return true;
+    }
+
+    private Voice NewVoice()
+    {
+        var voice = new Voice(new MediaPlayer());
+        var player = voice.Player;
+        player.MediaOpened += (_, _) =>
+        {
+            if (voice.RewardId is not { } id || !_playing.TryGetValue(id, out var current) || !ReferenceEquals(current, voice)) return;
+            player.Volume = voice.Volume;
+            player.Play();
+            GroupSoon();
+        };
+        player.MediaEnded += (_, _) =>
+        {
+            if (voice.RewardId is not { } id) return;
+            Log.Write("Reward alert ended.");
+            Release(id, voice);
+        };
+        player.MediaFailed += (_, e) =>
+        {
+            if (voice.RewardId is not { } id) return;
+            var reason = e.ErrorException?.Message ?? "неизвестная ошибка";
+            Log.Write("Reward alert failed: " + reason);
+            Failed?.Invoke("Не получилось проиграть этот файл: он повреждён или такой формат не поддерживается.");
+            Release(id, voice);
+        };
+        return voice;
+    }
+
+    private void Park(Voice voice)
+    {
+        voice.RewardId = null;
+        try
+        {
+            voice.Player.Stop();
+            if (EnsureSilenceFile() is { } silence) voice.Player.Open(new Uri(silence));
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Parking the alert player failed: " + ex.Message);
+            try { voice.Player.Close(); } catch (Exception) { }
+            return;
+        }
+        if (!_idle.Contains(voice)) _idle.Push(voice);
+    }
+
+    private void GroupSoon()
+    {
+        if (_grouping == null)
+        {
+            _grouping = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+            _grouping.Tick += (_, _) =>
+            {
+                _grouping!.Stop();
+                AudioSessions.GroupMine("StreamHelper");
+            };
+        }
+        _grouping.Stop();
+        _grouping.Start();
     }
     private int WakeOutput()
     {
@@ -246,14 +293,18 @@ public sealed class RewardAlertService
             var silent = new MediaPlayer { Volume = 1 };
             silent.MediaEnded += (_, _) =>
             {
-                if (!ReferenceEquals(_silent, silent)) return;
+                if (!ReferenceEquals(_silent, silent) || !_silentRunning) return;
                 silent.Position = TimeSpan.Zero;
                 silent.Play();
             };
             silent.MediaFailed += (_, e) =>
             {
                 Log.Write("Silent stream failed: " + (e.ErrorException?.Message ?? "unknown error"));
-                if (ReferenceEquals(_silent, silent)) _silent = null;
+                if (ReferenceEquals(_silent, silent))
+                {
+                    _silent = null;
+                    _silentRunning = false;
+                }
                 try { silent.Close(); } catch (Exception) { }
             };
             try
@@ -268,6 +319,15 @@ public sealed class RewardAlertService
                 return 0;
             }
             _silent = silent;
+            _silentRunning = true;
+            _silentReadyAt = now + WakeMs;
+            GroupSoon();
+        }
+        else if (!_silentRunning)
+        {
+            _silent.Position = TimeSpan.Zero;
+            _silent.Play();
+            _silentRunning = true;
             _silentReadyAt = now + WakeMs;
         }
         return (int)Math.Max(0, _silentReadyAt - now);
@@ -305,16 +365,15 @@ public sealed class RewardAlertService
     private void StopSilent()
     {
         _silentStop?.Stop();
-        var silent = _silent;
-        _silent = null;
-        if (silent == null) return;
+        if (_silent == null || !_silentRunning) return;
+        _silentRunning = false;
         try
         {
-            silent.Close();
+            _silent.Pause();
         }
         catch (Exception ex)
         {
-            Log.Write("Closing the silent stream failed: " + ex.Message);
+            Log.Write("Pausing the silent stream failed: " + ex.Message);
         }
     }
 
@@ -361,20 +420,13 @@ public sealed class RewardAlertService
             waiting.Stop();
             if (_playing.Count == 0 && _starts.Count == 0) ArmSilentStop();
         }
-        if (_playing.TryGetValue(rewardId, out var player)) Release(rewardId, player);
+        if (_playing.TryGetValue(rewardId, out var voice)) Release(rewardId, voice);
     }
 
-    private void Release(string rewardId, MediaPlayer player)
+    private void Release(string rewardId, Voice voice)
     {
-        try
-        {
-            player.Close();
-        }
-        catch (Exception ex)
-        {
-            Log.Write("Closing the alert player failed: " + ex.Message);
-        }
-        if (_playing.TryGetValue(rewardId, out var current) && ReferenceEquals(current, player)) _playing.Remove(rewardId);
+        if (_playing.TryGetValue(rewardId, out var current) && ReferenceEquals(current, voice)) _playing.Remove(rewardId);
+        Park(voice);
         if (_playing.Count == 0 && _starts.Count == 0) ArmSilentStop();
     }
     private void DeleteFiles(string baseName)
@@ -401,5 +453,14 @@ public sealed class RewardAlertService
         {
             Log.Write("Removing the old alert sound failed: " + ex.Message);
         }
+    }
+
+    private sealed class Voice
+    {
+        public Voice(MediaPlayer player) => Player = player;
+
+        public MediaPlayer Player { get; }
+        public string? RewardId { get; set; }
+        public double Volume { get; set; }
     }
 }

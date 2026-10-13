@@ -25,8 +25,10 @@ public partial class App : Application
     private TrayIcon? _tray;
     private string[] _args = Array.Empty<string>();
     private readonly string? _exePath = Environment.ProcessPath;
+    private readonly Dictionary<long, (DonationVideo Video, DateTime AtUtc)> _waitingVideos = new();
 
     private const string RestartFlag = "--restarted";
+    private static readonly TimeSpan WaitingVideoLife = TimeSpan.FromMinutes(30);
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -216,6 +218,9 @@ public partial class App : Application
             settings, new DonatePayClient(settings, _http!, Environment.GetEnvironmentVariable("STREAMHELPER_DONATEPAY_URL")), OnUi<Donation>(OnDonations));
         services.DonateXPoller = new DonateXPoller(
             settings, new DonateXClient(settings, _http!, Environment.GetEnvironmentVariable("STREAMHELPER_DONATEX_URL")), OnUi<Donation>(OnDonations));
+        services.DaMedia = new DaMediaFeed(_http!, () => settings.Current.DaWidgetLink, Environment.GetEnvironmentVariable("STREAMHELPER_DA_WIDGET_URL"));
+        services.DaMedia.VideoFound += (id, video) => Dispatcher.InvokeAsync(() => AttachVideo(id, video));
+        if (Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL") is { Length: > 0 } images) Donation.VideoImagesBase = images;
         services.DonationStatus = new DonationStatusHub(
             (DonationSources.DonationAlerts, services.Poller), (DonationSources.DonatePay, services.DonatePayPoller),
             (DonationSources.DonateX, services.DonateXPoller));
@@ -364,8 +369,31 @@ public partial class App : Application
         services.Toasts.Show(text.Title, text.Line, text.Message);
     }
 
-    private void OnDonations(IReadOnlyList<Donation> items) =>
+    private void OnDonations(IReadOnlyList<Donation> items)
+    {
+        foreach (var item in items)
+        {
+            if (item.Source.Length == 0 && _waitingVideos.Remove(item.Id, out var waiting)) Attach(item, waiting.Video);
+        }
         Deliver(s => s.Donations, items, _ => true, EventToasts.Donations);
+    }
+
+    private void AttachVideo(long donationId, DonationVideo video)
+    {
+        var services = _services;
+        if (services == null) return;
+        var donation = services.Donations.Items.FirstOrDefault(d => d.Source.Length == 0 && d.Id == donationId);
+        if (donation != null)
+        {
+            Attach(donation, video);
+            return;
+        }
+        var now = DateTime.UtcNow;
+        foreach (var stale in _waitingVideos.Where(pair => now - pair.Value.AtUtc > WaitingVideoLife).Select(pair => pair.Key).ToList()) _waitingVideos.Remove(stale);
+        _waitingVideos[donationId] = (video, now);
+    }
+
+    private static void Attach(Donation donation, DonationVideo video) => donation.AttachVideo(video.VideoId, video.Title, video.Url);
 
     private void OnFollowers(IReadOnlyList<Follower> items) =>
         Deliver(s => s.Followers, items, s => s.NotifyFollowers, EventToasts.Followers);

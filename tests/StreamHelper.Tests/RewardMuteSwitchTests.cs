@@ -1,6 +1,4 @@
-using System.Net.Http;
 using StreamHelper.Api;
-using StreamHelper.Models;
 using StreamHelper.Storage;
 using StreamHelper.Sync;
 

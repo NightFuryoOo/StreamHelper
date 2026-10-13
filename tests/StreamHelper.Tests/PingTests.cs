@@ -1,4 +1,3 @@
-using System.Net.WebSockets;
 using StreamHelper.Api;
 using StreamHelper.Models;
 using StreamHelper.Storage;

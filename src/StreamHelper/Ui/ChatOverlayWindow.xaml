@@ -232,6 +232,11 @@
                     AutomationProperties.Name="Кого упомянуть">
                 <StackPanel x:Name="MentionList"/>
             </Border>
+            <Border x:Name="CopiedStrip" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,10"
+                    Background="#EE181B22" BorderBrush="#4C9AFF" BorderThickness="1" CornerRadius="10" Padding="10,2"
+                    IsHitTestVisible="False" Visibility="Collapsed">
+                <TextBlock FontSize="12" Foreground="#E6E8EE" Text="Скопировано"/>
+            </Border>
             <Border x:Name="ComposeBox" Grid.Row="2" Margin="10,0,10,8" Background="#EE181B22" BorderBrush="#3A3F4B" BorderThickness="1"
                     CornerRadius="8" Padding="8,5,8,6" Visibility="Collapsed">
                 <StackPanel>

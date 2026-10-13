@@ -99,6 +99,7 @@ public partial class ChatOverlayWindow : Window
         InitVotes(votes, watcher);
         InitCompose(chatSend);
         InitViewers();
+        InitSelection();
         ApplyAppearance();
         MoveToConfiguredPlace();
     }
@@ -202,6 +203,7 @@ public partial class ChatOverlayWindow : Window
         }
 
         _idle.Stop();
+        ClearSelection();
         foreach (var line in _lines)
         {
             if (line.Actions != null) line.Actions.Visibility = Visibility.Collapsed;
@@ -397,7 +399,8 @@ public partial class ChatOverlayWindow : Window
         var reply = message.Reply is { } parent ? ReplyLine(parent, size) : null;
         var body = new StackPanel();
         if (reply != null) body.Children.Add(reply);
-        body.Children.Add(text);
+        var highlight = new Canvas { IsHitTestVisible = false };
+        body.Children.Add(new Grid { Children = { highlight, text } });
         root.Children.Add(body);
         var box = new Border
         {
@@ -408,7 +411,8 @@ public partial class ChatOverlayWindow : Window
             Padding = new Thickness(6, 2, 6, 2),
             Margin = new Thickness(0, 0, 0, 2),
         };
-        var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply, Content = content, Body = body };
+        var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply, Content = content, Body = body, Highlight = highlight };
+        text.SizeChanged += (_, _) => RepaintSelection(line);
         if (CanModerate(message)) AddActions(line);
         box.MouseRightButtonUp += (_, e) =>
         {
@@ -433,6 +437,7 @@ public partial class ChatOverlayWindow : Window
         if (_deletedIds.Contains(message.MessageId)) MarkDeleted(line);
         while (Lines.Children.Count > MaxLines)
         {
+            ForgetSelectionOf(_lines[0]);
             Lines.Children.RemoveAt(0);
             _lines.RemoveAt(0);
         }
@@ -497,6 +502,7 @@ public partial class ChatOverlayWindow : Window
 
     public void ResetChannel()
     {
+        ClearSelection();
         _chatters.Clear();
         HideMentions();
         HideEmotes(focusInput: false);
@@ -530,6 +536,8 @@ public partial class ChatOverlayWindow : Window
         public List<Inline> Content { get; set; } = new();
         public StackPanel Body { get; init; } = new();
         public LinkCard? Card { get; set; }
+        public Canvas Highlight { get; init; } = new();
+        public (System.Windows.Documents.TextPointer From, System.Windows.Documents.TextPointer To)? Selected { get; set; }
         public Brush NickBrush { get; }
         public Border? Actions { get; set; }
         public IconButton? Mute { get; set; }

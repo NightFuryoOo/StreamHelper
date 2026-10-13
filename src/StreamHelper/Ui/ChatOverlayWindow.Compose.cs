@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -72,16 +73,8 @@ public partial class ChatOverlayWindow
         _ = DrainAsync();
     }
 
-    private static bool IsInside(DependencyObject container, DependencyObject? element)
-    {
-        for (var current = element; current != null; current = current is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
-                 ? System.Windows.Media.VisualTreeHelper.GetParent(current)
-                 : LogicalTreeHelper.GetParent(current))
-        {
-            if (ReferenceEquals(current, container)) return true;
-        }
-        return false;
-    }
+    private static bool IsInside(DependencyObject container, DependencyObject? element) =>
+        TreeWalk.UpFrom(element).Any(node => ReferenceEquals(node, container));
 
     public void BeginTyping()
     {
@@ -89,6 +82,7 @@ public partial class ChatOverlayWindow
         if (!_typing)
         {
             _typing = true;
+            ReleaseCopyKey();
             var previous = NativeMethods.GetForegroundWindow();
             _typingReturnTo = previous == _handle ? IntPtr.Zero : previous;
             _idle.Stop();

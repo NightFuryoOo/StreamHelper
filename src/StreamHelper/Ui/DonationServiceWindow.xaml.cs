@@ -79,11 +79,52 @@ public partial class DonationServiceWindow : Window
         var poller = DonationServices.Poller(services, service);
         ApplyStatus(poller.Status);
         poller.StatusChanged += OnStatusChanged;
+        if (service == DonationService.DonationAlerts)
+        {
+            VideoPanel.Visibility = Visibility.Visible;
+            ApplyVideoStatus(services.DaMedia.Status);
+            services.DaMedia.StatusChanged += OnVideoStatusChanged;
+        }
         Closed += (_, _) =>
         {
             poller.StatusChanged -= OnStatusChanged;
+            services.DaMedia.StatusChanged -= OnVideoStatusChanged;
             _connectCts?.Cancel();
         };
+    }
+
+    private void OnVideoStatusChanged(SyncStatus status) => Dispatcher.InvokeAsync(() => ApplyVideoStatus(status));
+
+    private void ApplyVideoStatus(SyncStatus status) => ShowVideoStatus(status.Message, DonationServices.BrushKey(status.State));
+
+    private void ShowVideoStatus(string message, string brushKey)
+    {
+        VideoStatusText.Text = message;
+        VideoDot.Fill = (Brush)Application.Current.Resources[brushKey];
+        VideoForgetButton.Visibility = _services.Settings.Current.DaWidgetLinkProtected.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnSaveVideoLink(object sender, RoutedEventArgs e)
+    {
+        var link = VideoLinkBox.Password.Trim();
+        if (link.Length == 0) return;
+        if (!DaMediaFeed.IsWidgetLink(link))
+        {
+            ShowVideoStatus("Это не ссылка виджета DonationAlerts. Нужна ссылка вида https://www.donationalerts.com/widget/…?token=…", "DangerBrush");
+            return;
+        }
+        _services.Settings.Current.DaWidgetLink = link;
+        _services.Settings.Save();
+        VideoLinkBox.Clear();
+        _services.DaMedia.Start();
+    }
+
+    private void OnForgetVideoLink(object sender, RoutedEventArgs e)
+    {
+        _services.Settings.Current.DaWidgetLink = "";
+        _services.Settings.Save();
+        VideoLinkBox.Clear();
+        _services.DaMedia.Start();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -116,6 +157,11 @@ public partial class DonationServiceWindow : Window
         {
             e.Handled = true;
             OnConnect(this, new RoutedEventArgs());
+        }
+        else if (e.Key == Key.Enter && VideoLinkBox.IsKeyboardFocused)
+        {
+            e.Handled = true;
+            OnSaveVideoLink(this, new RoutedEventArgs());
         }
     }
 

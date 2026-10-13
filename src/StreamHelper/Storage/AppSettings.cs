@@ -53,6 +53,7 @@ public sealed class AppSettings
     public string AccessTokenProtected { get; set; } = "";
     public string RefreshTokenProtected { get; set; } = "";
     public DateTime AccessTokenExpiresUtc { get; set; }
+    public string DaWidgetLinkProtected { get; set; } = "";
 
     public int RedirectPort { get; set; } = 7653;
 
@@ -362,6 +363,13 @@ public sealed class AppSettings
     {
         get => Secrets.Unprotect(RefreshTokenProtected);
         set => RefreshTokenProtected = Secrets.Protect(value);
+    }
+
+    [JsonIgnore]
+    public string DaWidgetLink
+    {
+        get => Secrets.Unprotect(DaWidgetLinkProtected);
+        set => DaWidgetLinkProtected = value.Length == 0 ? "" : Secrets.Protect(value);
     }
 
     [JsonIgnore]

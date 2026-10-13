@@ -15,6 +15,7 @@ internal static class NativeMethods
     public const int MaActivate = 1;
     public const int MaNoActivate = 3;
     public const uint ModNoRepeat = 0x4000;
+    public const uint ModControl = 0x0002;
 
     public static readonly IntPtr HwndTopmost = new(-1);
     public static readonly IntPtr HwndMessage = new(-3);

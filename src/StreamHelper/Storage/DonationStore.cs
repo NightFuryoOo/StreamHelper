@@ -7,7 +7,7 @@ namespace StreamHelper.Storage;
 public sealed class DonationStore : EventStore<Donation>
 {
     public DonationStore(string path)
-        : base(path, nameof(Donation.Seen), nameof(Donation.Done), nameof(Donation.CustomName))
+        : base(path, nameof(Donation.Seen), nameof(Donation.Done), nameof(Donation.CustomName), nameof(Donation.VideoTitle))
     {
         Load();
     }

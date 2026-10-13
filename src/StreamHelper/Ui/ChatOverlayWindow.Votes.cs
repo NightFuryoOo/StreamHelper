@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Models;
@@ -115,14 +114,8 @@ public partial class ChatOverlayWindow
         foreach (var card in _voteCards) card.SetInteractive(on, now);
     }
 
-    private static VoteCardModel? CardOf(object sender)
-    {
-        for (DependencyObject? node = sender as DependencyObject; node != null; node = VisualTreeHelper.GetParent(node))
-        {
-            if (node is FrameworkElement { DataContext: VoteCardModel card }) return card;
-        }
-        return null;
-    }
+    private static VoteCardModel? CardOf(object sender) =>
+        TreeWalk.UpFrom(sender as DependencyObject).Select(node => (node as FrameworkElement)?.DataContext).OfType<VoteCardModel>().FirstOrDefault();
 
     private async void OnVoteEnd(object sender, RoutedEventArgs e)
     {

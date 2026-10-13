@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Net.Http;
 using StreamHelper.Api;
 using StreamHelper.Storage;
 using StreamHelper.Sync;

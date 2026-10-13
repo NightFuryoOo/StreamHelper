@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using StreamHelper.Api;
@@ -279,28 +278,8 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         return true;
     }
 
-    private static async Task<string?> ReceiveAsync(ClientWebSocket socket, TimeSpan timeout, CancellationToken ct)
-    {
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(timeout);
-        var buffer = new byte[8192];
-        using var stream = new MemoryStream();
-        try
-        {
-            while (true)
-            {
-                var result = await socket.ReceiveAsync(buffer, timeoutCts.Token);
-                if (result.MessageType == WebSocketMessageType.Close) return null;
-                stream.Write(buffer, 0, result.Count);
-                if (stream.Length > 1_000_000) throw new IOException("Twitch прислал слишком большое сообщение.");
-                if (result.EndOfMessage) return Encoding.UTF8.GetString(stream.ToArray());
-            }
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            throw new TimeoutException("нет сообщений от Twitch дольше таймаута, переподключаюсь.");
-        }
-    }
+    private static Task<string?> ReceiveAsync(ClientWebSocket socket, TimeSpan timeout, CancellationToken ct) =>
+        WebSocketText.ReceiveAsync(socket, timeout, "нет сообщений от Twitch дольше таймаута, переподключаюсь.", "Twitch прислал слишком большое сообщение.", ct);
 
     private static async Task WaitAsync(TimeSpan delay, CancellationToken token)
     {

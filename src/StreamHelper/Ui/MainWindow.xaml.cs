@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -51,10 +52,7 @@ public partial class MainWindow : Window
     {
         if (_selectionFocus && !IsInsideSelectable(e.OriginalSource as DependencyObject)) EndSelection(giveFocusBack: true);
         if (_editing == null) return;
-        for (var node = e.OriginalSource as DependencyObject; node != null; node = System.Windows.Media.VisualTreeHelper.GetParent(node))
-        {
-            if (node is System.Windows.Controls.TextBox) return;
-        }
+        if (TreeWalk.UpFrom(e.OriginalSource as DependencyObject).Any(node => node is System.Windows.Controls.TextBox)) return;
         FinishRename(commit: true);
     }
 
@@ -208,6 +206,11 @@ public partial class MainWindow : Window
     private void OnHideClick(object sender, RoutedEventArgs e) => HideOverlay();
 
     private void OnSettingsClick(object sender, RoutedEventArgs e) => _services.OpenSettings();
+
+    private void OnVideoClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is Donation { VideoUrl: { Length: > 0 } url }) BrowserLauncher.Open(url);
+    }
 
     private void OnDeleteClick(object sender, RoutedEventArgs e)
     {
@@ -519,16 +522,8 @@ public partial class MainWindow : Window
         EndSelection(giveFocusBack: true);
     }
 
-    private static bool IsInsideSelectable(DependencyObject? source)
-    {
-        for (var node = source; node != null; node = node is Visual or System.Windows.Media.Media3D.Visual3D
-                 ? VisualTreeHelper.GetParent(node)
-                 : LogicalTreeHelper.GetParent(node))
-        {
-            if (node is System.Windows.Controls.TextBox { IsReadOnly: true }) return true;
-        }
-        return false;
-    }
+    private static bool IsInsideSelectable(DependencyObject? source) =>
+        TreeWalk.UpFrom(source).Any(node => node is System.Windows.Controls.TextBox { IsReadOnly: true });
 
     private void OnRenameKeyDown(object sender, KeyEventArgs e)
     {

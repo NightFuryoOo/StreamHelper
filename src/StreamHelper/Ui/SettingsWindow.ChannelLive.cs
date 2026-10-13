@@ -22,7 +22,7 @@ public partial class SettingsWindow
 
     private readonly Dictionary<string, string> _faceUrls = new(StringComparer.Ordinal);
     private readonly HashSet<string> _faceWanted = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _faceTried = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ImageSource> _faces = new(StringComparer.Ordinal);
     private readonly List<(string Id, ChannelAvatar Avatar)> _faceSlots = new();
     private bool _facesLoading;
     private readonly System.Windows.Threading.DispatcherTimer _liveTimer = new() { Interval = TimeSpan.FromMinutes(1) };
@@ -57,7 +57,17 @@ public partial class SettingsWindow
 
     private void ShowFace(string id, ChannelAvatar avatar)
     {
-        if (_faceUrls.TryGetValue(id, out var url) && url.Length > 0 && _services.Images.Get(url) is { } picture) avatar.Show(picture.Frames[0]);
+        if (!_faceUrls.TryGetValue(id, out var url) || url.Length == 0) return;
+        if (FaceOf(url) is { } picture) avatar.Show(picture);
+        else _ = LoadFaceAsync(url);
+    }
+
+    private ImageSource? FaceOf(string url)
+    {
+        if (_faces.TryGetValue(url, out var kept)) return kept;
+        if (_services.Images.Get(url) is not { } frames) return null;
+        _faces[url] = frames.Frames[0];
+        return frames.Frames[0];
     }
 
     private async Task LoadFacesAsync(IReadOnlyList<string> ids)
@@ -78,13 +88,13 @@ public partial class SettingsWindow
                     foreach (var user in users) _faceUrls[user.Id] = user.ProfileImageUrl;
                 }
                 var urls = _faceWanted.Select(id => _faceUrls[id])
-                    .Where(url => url.Length > 0 && _services.Images.Get(url) == null && _faceTried.Add(url))
+                    .Where(url => url.Length > 0 && FaceOf(url) == null)
                     .Distinct()
                     .ToList();
                 if (urls.Count > 0)
                 {
                     await Task.WhenAll(urls.Select(LoadFaceAsync));
-                    Log.Write($"Channel pictures: {urls.Count(url => _services.Images.Get(url) != null)} of {urls.Count} loaded.");
+                    Log.Write($"Channel pictures: {urls.Count(url => FaceOf(url) != null)} of {urls.Count} loaded.");
                 }
                 if (_faceWanted.All(_faceUrls.ContainsKey)) break;
             }
@@ -101,10 +111,11 @@ public partial class SettingsWindow
 
     private async Task LoadFaceAsync(string url)
     {
-        await _services.Images.LoadAsync(url);
+        if (await _services.Images.LoadAsync(url) is not { } frames) return;
+        _faces[url] = frames.Frames[0];
         foreach (var (id, avatar) in _faceSlots)
         {
-            if (_faceUrls.TryGetValue(id, out var wanted) && wanted == url) ShowFace(id, avatar);
+            if (_faceUrls.TryGetValue(id, out var wanted) && wanted == url) avatar.Show(frames.Frames[0]);
         }
     }
 

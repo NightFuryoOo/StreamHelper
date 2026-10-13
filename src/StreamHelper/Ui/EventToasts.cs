@@ -12,9 +12,11 @@ public static class EventToasts
     public static ToastText Donations(IReadOnlyList<Donation> added)
     {
         var newest = added[^1];
+        var video = newest.HasVideo ? "▶ " + newest.VideoTitle : null;
+        var message = video == null ? newest.Message : newest.HasMessage ? newest.Message + "\n" + video : video;
         return new ToastText(
             added.Count == 1 ? "Новый донат" : $"Новых донатов: {added.Count}",
-            $"{newest.Username} · {newest.AmountText}", newest.Message);
+            $"{newest.Username} · {newest.AmountText}", message);
     }
 
     public static ToastText Followers(IReadOnlyList<Follower> added) =>

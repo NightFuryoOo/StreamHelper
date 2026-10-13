@@ -44,6 +44,15 @@ public partial class ChatOverlayWindow
             reply.Click += (_, _) => Dispatcher.InvokeAsync(() => ReplyTo(line.Message));
             menu.Items.Add(reply);
         }
+        if (HasSelection)
+        {
+            var copySelected = Item("Копировать");
+            copySelected.Click += (_, _) => CopySelection();
+            menu.Items.Add(copySelected);
+        }
+        var copyMessage = Item("Копировать сообщение");
+        copyMessage.Click += (_, _) => CopyText(line.Message.Text);
+        menu.Items.Add(copyMessage);
         if (CanModerate(line.Message)) menu.Items.Add(ShoutoutItem(menu, line));
 
         var label = new MenuItem { Header = "Подсветить", IsEnabled = false };

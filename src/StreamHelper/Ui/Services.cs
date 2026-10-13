@@ -36,6 +36,7 @@ public sealed class Services
     public DonationPoller Poller { get; set; } = null!;
     public DonatePayPoller DonatePayPoller { get; set; } = null!;
     public DonateXPoller DonateXPoller { get; set; } = null!;
+    public DaMediaFeed DaMedia { get; set; } = null!;
     public DonationStatusHub DonationStatus { get; set; } = null!;
     public FollowerPoller FollowerPoller { get; set; } = null!;
     public SubscriptionListener SubscriptionListener { get; set; } = null!;
@@ -44,7 +45,7 @@ public sealed class Services
     public MainWindow Overlay { get; set; } = null!;
 
     public IReadOnlyList<ISyncWorker> Workers =>
-        new ISyncWorker[] { Poller, DonatePayPoller, DonateXPoller, FollowerPoller, SubscriptionListener, RewardListener, PingListener, Votes };
+        new ISyncWorker[] { Poller, DonatePayPoller, DonateXPoller, DaMedia, FollowerPoller, SubscriptionListener, RewardListener, PingListener, Votes };
     public Action<IReadOnlyList<Donation>> HandleDonations { get; set; } = _ => { };
     public Action<IReadOnlyList<Follower>> HandleFollowers { get; set; } = _ => { };
     public Action<IReadOnlyList<Subscriber>> HandleSubscribers { get; set; } = _ => { };

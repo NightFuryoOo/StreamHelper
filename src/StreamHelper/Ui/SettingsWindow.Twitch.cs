@@ -109,17 +109,7 @@ public partial class SettingsWindow
         }
     }
 
-    private void OnCopyTwitchCode(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            Clipboard.SetText(TwitchCodeBox.Text);
-        }
-        catch (Exception ex)
-        {
-            Log.Write("Clipboard failed: " + ex.Message);
-        }
-    }
+    private void OnCopyTwitchCode(object sender, RoutedEventArgs e) => ClipboardText.TrySet(TwitchCodeBox.Text);
 
     private void OnTwitchDisconnect(object sender, RoutedEventArgs e)
     {

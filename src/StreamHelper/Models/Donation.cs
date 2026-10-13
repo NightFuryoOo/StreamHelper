@@ -38,6 +38,45 @@ public sealed class Donation : StreamHelper.Storage.ISeenItem, StreamHelper.Stor
     public string Message { get; set; } = "";
     public DateTime CreatedAtUtc { get; set; }
 
+    private string? _videoTitle;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoUrl { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoTitle
+    {
+        get => _videoTitle;
+        set
+        {
+            if (_videoTitle == value) return;
+            _videoTitle = value;
+            Raise();
+            Raise(nameof(HasVideo));
+            Raise(nameof(VideoThumbnail));
+            Raise(nameof(VideoName));
+        }
+    }
+
+    public static string VideoImagesBase { get; set; } = "https://i.ytimg.com";
+
+    [JsonIgnore] public bool HasVideo => !string.IsNullOrEmpty(VideoUrl);
+
+    [JsonIgnore]
+    public string? VideoThumbnail => string.IsNullOrEmpty(VideoId) ? null : $"{VideoImagesBase.TrimEnd('/')}/vi/{Uri.EscapeDataString(VideoId)}/mqdefault.jpg";
+
+    [JsonIgnore] public string VideoName => "Видео: " + (VideoTitle ?? VideoUrl ?? "");
+
+    public void AttachVideo(string videoId, string title, string url)
+    {
+        VideoId = videoId.Length > 0 ? videoId : null;
+        VideoUrl = url;
+        VideoTitle = title.Length > 0 ? title : url;
+    }
+
     public bool Seen
     {
         get => _seen;

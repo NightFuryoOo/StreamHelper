@@ -324,16 +324,7 @@ public sealed class EmoteTextBox : RichTextBox
             e.Handled = true;
             var (start, end) = SelectionRange();
             if (end <= start) return;
-            var text = Text;
-            try
-            {
-                Clipboard.SetText(text[start..end]);
-            }
-            catch (Exception ex) when (ex is System.Runtime.InteropServices.ExternalException)
-            {
-                Log.Write("Copying the typed text failed: " + ex.Message);
-                return;
-            }
+            if (!ClipboardText.TrySet(Text[start..end])) return;
             if (e.Command == ApplicationCommands.Cut && !IsReadOnly) Replace(start, end, "");
             return;
         }

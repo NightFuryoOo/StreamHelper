@@ -58,6 +58,7 @@ public static class Profile
         nameof(AppSettings.AccessTokenProtected),
         nameof(AppSettings.RefreshTokenProtected),
         nameof(AppSettings.AccessTokenExpiresUtc),
+        nameof(AppSettings.DaWidgetLinkProtected),
         nameof(AppSettings.RedirectPort),
         nameof(AppSettings.LastDonationId),
         nameof(AppSettings.Baselined),
