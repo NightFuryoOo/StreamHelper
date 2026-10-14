@@ -19,11 +19,21 @@ public partial class SettingsWindow
     private string? _channelError;
     private bool _channelsLoading;
     private bool _buildingChannels;
+    private bool _channelPickerOpen;
+
+    public static (string Kind, string Note) ChannelRole(AppSettings settings) =>
+        settings.IsOwnChannel ? ("свой канал", "Работает всё: чат, уведомления, подписки, награды, опросы и предикты.")
+        : settings.IsViewerChannel ? ("как зритель", "Только чат поверх игры и сообщения в чат.")
+        : ("модератор", "Чат поверх игры, бан и мут, удаление сообщений и «Отметить». Уведомления, подписки и награды — только на своём канале.");
+
+    public static bool MatchesSearch(string label, string query) =>
+        query.Trim().Length == 0 || label.Contains(query.Trim(), StringComparison.CurrentCultureIgnoreCase);
 
     private void RefreshChannelBlock()
     {
         var settings = _services.Settings.Current;
         ChannelBlock.Visibility = settings.HasTwitchTokens ? Visibility.Visible : Visibility.Collapsed;
+        ChannelSummary.Visibility = ChannelBlock.Visibility;
         if (!settings.HasTwitchTokens) return;
 
         _buildingChannels = true;
@@ -31,18 +41,21 @@ public partial class SettingsWindow
         ModeratedChoices.Children.Clear();
         ViewerChoices.Children.Clear();
         _faceSlots.Clear();
+        ShowCurrentChannel(settings);
         ChannelChoices.Children.Add(ChannelChoice($"Свой канал · {settings.TwitchLogin}", new ChannelPick(null, false), settings.IsOwnChannel, withFace: false));
 
+        var query = ChannelSearchBox.Text;
         var moderated = (_moderated ?? Array.Empty<ModeratedChannel>()).ToList();
         var chosenModerated = !settings.IsOwnChannel && !settings.IsViewerChannel;
         if (chosenModerated && moderated.All(c => c.Id != settings.TwitchChannelId))
         {
             moderated.Insert(0, new ModeratedChannel(settings.TwitchChannelId, settings.TwitchChannelLogin, settings.TwitchChannelName));
         }
-        foreach (var channel in moderated)
+        foreach (var channel in moderated.Where(c => MatchesSearch(c.Label, query)))
         {
             ModeratedChoices.Children.Add(ChannelChoice(channel.Label, new ChannelPick(channel, false), chosenModerated && channel.Id == settings.TwitchChannelId));
         }
+        ModeratedLabel.Text = moderated.Count > 0 ? $"Где ты модератор · {moderated.Count}" : "Где ты модератор";
         ModeratedLabel.Visibility = moderated.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         var viewers = settings.ViewerChannels.Where(c => moderated.All(m => m.Id != c.Id)).ToList();
@@ -50,8 +63,13 @@ public partial class SettingsWindow
         {
             viewers.Insert(0, new SavedChannel(settings.TwitchChannelId, settings.TwitchChannelLogin, settings.TwitchChannelName));
         }
-        foreach (var channel in viewers) ViewerChoices.Children.Add(ViewerChoice(channel, settings.IsViewerChannel && channel.Id == settings.TwitchChannelId));
+        foreach (var channel in viewers.Where(c => MatchesSearch(c.Label, query)))
+        {
+            ViewerChoices.Children.Add(ViewerChoice(channel, settings.IsViewerChannel && channel.Id == settings.TwitchChannelId));
+        }
         _buildingChannels = false;
+        ChannelPicker.Visibility = _channelPickerOpen ? Visibility.Visible : Visibility.Collapsed;
+        ChannelPickerChevron.Angle = _channelPickerOpen ? 180 : 0;
 
         var (text, warn) = ChatRules.ChannelStatus(settings, _moderated, _channelsLoading, _channelError);
         ChannelStatusText.Text = text;
@@ -114,8 +132,62 @@ public partial class SettingsWindow
 
     private void Pick(ModeratedChannel? channel, bool asViewer)
     {
+        _channelPickerOpen = false;
         if (_services.ChangeChannel(channel, asViewer)) RefreshTwitchSummary();
         else RefreshChannelBlock();
+    }
+
+    private void ShowCurrentChannel(AppSettings settings)
+    {
+        var (kind, note) = ChannelRole(settings);
+        var name = settings.ChannelLabel;
+        CurrentChannelName.Text = name;
+        CurrentChannelKind.Text = kind;
+        CurrentChannelNote.Text = note;
+        ChannelSummaryText.Text = ChannelSummaryLine(settings);
+        var id = settings.IsOwnChannel ? settings.TwitchUserId : settings.TwitchChannelId;
+        var avatar = new ChannelAvatar(name, 30, 14, FaceBack);
+        if (id.Length > 0 && _live.ContainsKey(id))
+        {
+            avatar.Root.Children.Add(new System.Windows.Shapes.Ellipse
+            {
+                Width = 11,
+                Height = 11,
+                Fill = Freezables.LiveDot,
+                Stroke = DotRing,
+                StrokeThickness = 2,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, -2, -2, 0),
+                ToolTip = "В эфире",
+            });
+        }
+        CurrentChannelFace.Child = avatar.Root;
+        if (id.Length == 0) return;
+        ShowFace(id, avatar);
+        _faceSlots.Add((id, avatar));
+    }
+
+    public static string ChannelSummaryLine(AppSettings settings) => $"{settings.ChannelLabel} · {ChannelRole(settings).Kind}";
+
+    private void OnGoToChannelChoice(object sender, RoutedEventArgs e)
+    {
+        SelectPage(ChatPage);
+        Reveal(ChannelBlock);
+    }
+
+    private void OnToggleChannelPicker(object sender, RoutedEventArgs e)
+    {
+        _channelPickerOpen = !_channelPickerOpen;
+        ChannelPicker.Visibility = _channelPickerOpen ? Visibility.Visible : Visibility.Collapsed;
+        ChannelPickerChevron.Angle = _channelPickerOpen ? 180 : 0;
+        if (_channelPickerOpen) Reveal(ChannelPicker);
+    }
+
+    private void OnChannelSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        ChannelSearchHint.Visibility = ChannelSearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (!_loading) RefreshChannelBlock();
     }
 
     private async Task LoadModeratedChannelsAsync()

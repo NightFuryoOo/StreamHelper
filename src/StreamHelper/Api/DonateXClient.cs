@@ -39,7 +39,7 @@ public sealed class DonateXClient : IDonationWindowSource
 
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
-            throw new AuthRequiredException("DonateX отклонил токен. Проверь токен в настройках, вкладка «Донаты».");
+            throw new AuthRequiredException("DonateX отклонил токен. Проверь токен в настройках, раздел «Подключения».");
         }
         if (response.StatusCode == (HttpStatusCode)429)
         {

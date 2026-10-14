@@ -140,7 +140,7 @@ public static class Profile
         nameof(AppSettings.RewardCopies),
         nameof(AppSettings.HiddenRewardIds),
         nameof(AppSettings.SelectedTab),
-        nameof(AppSettings.SettingsSection),
+        nameof(AppSettings.SettingsPage),
         nameof(AppSettings.WindowLeft),
         nameof(AppSettings.WindowTop),
         nameof(AppSettings.WindowWidth),

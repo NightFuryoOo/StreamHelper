@@ -7,10 +7,10 @@ namespace StreamHelper.Ui;
 
 public static class BrandIcons
 {
-    private static readonly Brush TwitchPurple = Solid(Color.FromRgb(0x91, 0x46, 0xFF));
+    public static readonly Brush TwitchPurple = Solid(Color.FromRgb(0x91, 0x46, 0xFF));
     public static readonly Brush YouTubeRed = Solid(Color.FromRgb(0xFF, 0x00, 0x33));
-    private static readonly Geometry TwitchScreen = Frozen(Geometry.Parse("M6.857,1.714 H20.571 V11.143 L17.143,14.571 H13.714 L10.714,17.571 V14.571 H6.857 Z"));
-    private static readonly Geometry TwitchMark = Frozen(Geometry.Parse(
+    public static readonly Geometry TwitchScreen = Frozen(Geometry.Parse("M6.857,1.714 H20.571 V11.143 L17.143,14.571 H13.714 L10.714,17.571 V14.571 H6.857 Z"));
+    public static readonly Geometry TwitchMark = Frozen(Geometry.Parse(
         "M11.571,4.714 H13.286 V9.857 H11.571 Z M16.286,4.714 H18 V9.857 H16.286 Z M6,0 L1.714,4.286 V19.714 H6.857 V24 L11.143,19.714 H14.571 L22.286,12 V0 Z " +
         "M20.571,11.143 L17.143,14.571 H13.714 L10.714,17.571 V14.571 H6.857 V1.714 H20.571 Z"));
     public static readonly Geometry YouTubeBox = Frozen(Geometry.Parse(

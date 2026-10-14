@@ -23,6 +23,7 @@ public partial class App : Application
     private HttpClient? _http;
     private Services? _services;
     private TrayIcon? _tray;
+    private FullscreenWatch? _fullscreen;
     private string[] _args = Array.Empty<string>();
     private readonly string? _exePath = Environment.ProcessPath;
     private readonly Dictionary<long, (DonationVideo Video, DateTime AtUtc)> _waitingVideos = new();
@@ -100,6 +101,14 @@ public partial class App : Application
         services.RewardAlert.MutedChanged += muted => _ = services.RewardMute.SyncAsync();
         _ = services.RewardMute.SyncAsync();
         services.MuteBadge.Apply(services.RewardAlert.Muted);
+        _fullscreen = new FullscreenWatch();
+        _fullscreen.GameInFront += front =>
+        {
+            services.Chat.ReshowOverGame(front);
+            services.MuteBadge.ReshowOverGame();
+        };
+        _fullscreen.Start();
+        AttachRedemptionVideos(services, services.Redemptions.Items);
         _ = services.RefreshManagedRewardsAsync();
         if (_exePath != null) _ = UpdateInstaller.CleanUpSoonAsync(_exePath);
         if (UpdateInstaller.TakeMarker(AppPaths.Directory) is { } marker && marker.Version == AppVersion.Current)
@@ -190,6 +199,7 @@ public partial class App : Application
             RewardAlert = new RewardAlertService(settings),
             RewardMute = new RewardMuteSwitch(settings, twitch),
             MuteBadge = new MuteBadgeService(settings),
+            Previews = previews,
             ViewModel = viewModel,
             Updates = new UpdateService(
                 settings, _http, Environment.GetEnvironmentVariable("STREAMHELPER_GITHUB_API"), AppVersion.Value, _exePath,
@@ -220,7 +230,7 @@ public partial class App : Application
             settings, new DonateXClient(settings, _http!, Environment.GetEnvironmentVariable("STREAMHELPER_DONATEX_URL")), OnUi<Donation>(OnDonations));
         services.DaMedia = new DaMediaFeed(_http!, () => settings.Current.DaWidgetLink, Environment.GetEnvironmentVariable("STREAMHELPER_DA_WIDGET_URL"));
         services.DaMedia.VideoFound += (id, video) => Dispatcher.InvokeAsync(() => AttachVideo(id, video));
-        if (Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL") is { Length: > 0 } images) Donation.VideoImagesBase = images;
+        if (Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL") is { Length: > 0 } images) YouTubeImages.Base = images;
         services.DonationStatus = new DonationStatusHub(
             (DonationSources.DonationAlerts, services.Poller), (DonationSources.DonatePay, services.DonatePayPoller),
             (DonationSources.DonateX, services.DonateXPoller));
@@ -249,6 +259,7 @@ public partial class App : Application
             () => services.Overlay.Toggle(),
             () => services.Chat.ToggleVisible(),
             services.OpenSettings,
+            () => services.OpenHelp(),
             () =>
             {
                 services.Overlay.SaveBounds();
@@ -326,6 +337,7 @@ public partial class App : Application
         {
             foreach (var worker in _services.Workers) worker.Stop();
         }
+        _fullscreen?.Stop();
         _services?.Hotkey.Dispose();
         _services?.Toasts.Close();
         _services?.Chat.Close();
@@ -417,6 +429,13 @@ public partial class App : Application
         PlaySounds(services, soundOnly);
         foreach (var item in listed) item.CanManage = settings.ManagedRewardIds.Contains(item.RewardId);
         Deliver(s => s.Redemptions, listed, s => s.NotifyRewards, EventToasts.Redemptions, added => PlaySounds(services, added));
+        AttachRedemptionVideos(services, listed);
+    }
+
+    private static void AttachRedemptionVideos(Services services, IEnumerable<Redemption> redemptions)
+    {
+        if (services.Previews is not { } previews) return;
+        foreach (var redemption in redemptions.Where(r => r.HasInput).ToList()) _ = previews.AttachAsync(redemption);
     }
 
     private static void PlaySounds(Services services, IEnumerable<Redemption> redemptions)

@@ -61,14 +61,16 @@ public sealed class Donation : StreamHelper.Storage.ISeenItem, StreamHelper.Stor
         }
     }
 
-    public static string VideoImagesBase { get; set; } = "https://i.ytimg.com";
-
     [JsonIgnore] public bool HasVideo => !string.IsNullOrEmpty(VideoUrl);
 
     [JsonIgnore]
-    public string? VideoThumbnail => string.IsNullOrEmpty(VideoId) ? null : $"{VideoImagesBase.TrimEnd('/')}/vi/{Uri.EscapeDataString(VideoId)}/mqdefault.jpg";
+    public string? VideoThumbnail => string.IsNullOrEmpty(VideoId) ? null : YouTubeImages.Thumbnail(VideoId);
 
     [JsonIgnore] public string VideoName => "Видео: " + (VideoTitle ?? VideoUrl ?? "");
+
+    [JsonIgnore] public bool VideoIsClip => false;
+
+    [JsonIgnore] public string VideoLabel => "Заказанное видео";
 
     public void AttachVideo(string videoId, string title, string url)
     {

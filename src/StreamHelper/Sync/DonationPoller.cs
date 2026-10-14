@@ -29,7 +29,7 @@ public sealed class DonationPoller : PollingService
         var settings = _settings.Current;
         if (!settings.HasCredentials || !settings.HasTokens)
         {
-            SetStatus(SyncState.NotConnected, "Не подключено. Подключи DonationAlerts в настройках, вкладка «Донаты».");
+            SetStatus(SyncState.NotConnected, "Не подключено. Подключи DonationAlerts в настройках, раздел «Подключения».");
             return false;
         }
 

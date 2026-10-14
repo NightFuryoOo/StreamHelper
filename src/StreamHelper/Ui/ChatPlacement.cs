@@ -41,6 +41,13 @@ public static class ChatPlacement
 
     public static string PausedText(int waiting) => $"Чат на паузе · новых: {waiting}";
 
+    public const double PausedStripZone = 40;
+
+    public static bool NearPausedStrip(double pointerY, double viewportHeight) => pointerY >= viewportHeight - PausedStripZone;
+
+    public static bool ShowsPausedStrip(int waiting, bool copiedShown, bool selecting, bool pointerNear) =>
+        waiting > 0 && !copiedShown && !selecting && !pointerNear;
+
     public const double MinScrollThumb = 24;
 
     public static double MaxScroll(double content, double view) => Math.Max(0, content - view);

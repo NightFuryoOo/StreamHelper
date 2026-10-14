@@ -90,6 +90,12 @@ public partial class MuteBadgeWindow : Window
         Top = top;
     }
 
+    public void ReshowOver()
+    {
+        if (!IsVisible || _handle == IntPtr.Zero || _positioning || _corner != null) return;
+        FullscreenWatch.ShowAgainOnTop(this, _handle);
+    }
+
     private void KeepInFront()
     {
         if (!IsVisible || _handle == IntPtr.Zero || _positioning) return;

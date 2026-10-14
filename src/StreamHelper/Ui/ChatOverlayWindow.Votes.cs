@@ -228,10 +228,27 @@ public partial class ChatOverlayWindow
     private void ShowChannelMenu()
     {
         var menu = new ContextMenu { PlacementTarget = Panel, Placement = PlacementMode.MousePoint };
-        menu.Opened += (_, _) => _menuOpen = true;
-        menu.Closed += (_, _) => _menuOpen = false;
         AddChannelItems(menu);
+        OpenMenu(menu);
+    }
+
+    private void OpenMenu(ContextMenu menu)
+    {
+        CloseMenu();
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_menu, menu)) _menu = null;
+        };
+        menu.PreviewMouseMove += (_, _) => RestartIdle();
+        _menu = menu;
         menu.IsOpen = true;
+    }
+
+    private bool MenuOpen => _menu is { IsOpen: true };
+
+    private void CloseMenu()
+    {
+        if (_menu is { } menu) menu.IsOpen = false;
     }
 
     private void OpenVoteDialog(VoteKind kind)

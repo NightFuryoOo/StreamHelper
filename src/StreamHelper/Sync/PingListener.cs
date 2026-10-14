@@ -22,7 +22,7 @@ public sealed class PingListener : EventSubListener<ChatPing>
         "Пинги",
         TwitchClient.ChatScope,
         PingTypes,
-        "Для пингов, рейдов и стриков переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.",
+        "Для пингов, рейдов и стриков переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.",
         FollowsChannel: true,
         OptionalTypes: RemovalTypes);
 
@@ -89,6 +89,7 @@ public sealed class PingListener : EventSubListener<ChatPing>
         return new ChatPing
         {
             Key = chat.MessageId.Length > 0 ? chat.MessageId : message.MessageId,
+            ChatterId = chat.ChatterId,
             Login = chat.ChatterLogin,
             DisplayName = chat.ChatterName,
             Message = chat.Text,

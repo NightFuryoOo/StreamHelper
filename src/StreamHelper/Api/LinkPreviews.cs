@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using StreamHelper.Models;
 
 namespace StreamHelper.Api;
 
@@ -96,7 +97,7 @@ public static class PreviewLinks
         var title = Text(root, "title");
         if (title.Length == 0) return null;
         return new LinkPreview(PreviewKind.YouTube, "https://www.youtube.com/watch?v=" + videoId, title, Text(root, "author_name"), "", null, null,
-            $"{thumbnailBase.TrimEnd('/')}/vi/{Uri.EscapeDataString(videoId)}/mqdefault.jpg");
+            YouTubeImages.Thumbnail(videoId, thumbnailBase));
     }
 
     private static string Text(JsonElement element, string name) =>
@@ -106,7 +107,7 @@ public static class PreviewLinks
 public sealed class YouTubeClient : IVideoApi
 {
     public const string DefaultSite = "https://www.youtube.com";
-    public const string DefaultImages = "https://i.ytimg.com";
+    public const string DefaultImages = YouTubeImages.DefaultBase;
 
     private readonly HttpClient _http;
     private readonly string _site;

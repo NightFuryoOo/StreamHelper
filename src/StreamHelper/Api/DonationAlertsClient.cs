@@ -140,7 +140,7 @@ public sealed class DonationAlertsClient : IDonationSource
             var refresh = Settings.RefreshToken;
             if (refresh.Length == 0)
             {
-                throw new AuthRequiredException("Доступ к DonationAlerts истёк или отозван: нажми «Подключить» в настройках, вкладка «Донаты».");
+                throw new AuthRequiredException("Доступ к DonationAlerts истёк или отозван: нажми «Подключить» в настройках, раздел «Подключения».");
             }
 
             var form = new Dictionary<string, string>

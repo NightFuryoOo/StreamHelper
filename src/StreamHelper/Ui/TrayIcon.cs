@@ -12,14 +12,14 @@ internal sealed class TrayIcon : IDisposable
     public const string ToggleChatText = "Показать/Скрыть Чат";
     public const string ToggleWindowText = "Показать/Скрыть Меню Уведомлений";
 
-    public TrayIcon(Action toggle, Action toggleChat, Action openSettings, Action exit)
+    public TrayIcon(Action toggle, Action toggleChat, Action openSettings, Action openHelp, Action exit)
     {
         _image = AppIcon.Load(SystemInformation.SmallIconSize);
         _icon = new NotifyIcon
         {
             Icon = _image,
             Text = "StreamHelper",
-            ContextMenuStrip = BuildMenu(toggle, toggleChat, openSettings, exit),
+            ContextMenuStrip = BuildMenu(toggle, toggleChat, openSettings, openHelp, exit),
             Visible = true,
         };
         _icon.MouseClick += (_, e) =>
@@ -28,12 +28,13 @@ internal sealed class TrayIcon : IDisposable
         };
     }
 
-    internal static ContextMenuStrip BuildMenu(Action toggle, Action toggleChat, Action openSettings, Action exit)
+    internal static ContextMenuStrip BuildMenu(Action toggle, Action toggleChat, Action openSettings, Action openHelp, Action exit)
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add(ToggleChatText, null, (_, _) => toggleChat());
         menu.Items.Add(ToggleWindowText, null, (_, _) => toggle());
         menu.Items.Add("Настройки", null, (_, _) => openSettings());
+        menu.Items.Add("Справка", null, (_, _) => openHelp());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Выход", null, (_, _) => exit());
         return menu;

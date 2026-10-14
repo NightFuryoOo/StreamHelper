@@ -9,7 +9,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>StreamHelper</AssemblyName>
     <RootNamespace>StreamHelper</RootNamespace>
-    <Version>1.0.0.5</Version>
+    <Version>1.0.0.6</Version>
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
@@ -17,6 +17,8 @@
   <ItemGroup>
     <Resource Include="app_icon.ico" />
     <Resource Include="Assets\*.png" />
+    <Resource Include="Assets\Help\*.png" />
+    <Resource Include="Assets\Help\*.jpg" />
   </ItemGroup>
 
   <ItemGroup>

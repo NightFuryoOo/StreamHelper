@@ -8,7 +8,7 @@ namespace StreamHelper.Storage;
 public sealed class RedemptionStore : EventStore<Redemption>
 {
     public RedemptionStore(string path)
-        : base(path, nameof(Redemption.Seen), nameof(Redemption.Done), nameof(Redemption.Status), nameof(Redemption.CanManage))
+        : base(path, nameof(Redemption.Seen), nameof(Redemption.Done), nameof(Redemption.Status), nameof(Redemption.CanManage), nameof(Redemption.VideoUrl), nameof(Redemption.VideoTitle))
     {
         Load();
     }

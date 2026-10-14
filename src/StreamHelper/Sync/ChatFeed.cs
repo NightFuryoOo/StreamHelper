@@ -102,6 +102,15 @@ public sealed class ChatFeed
     public static string KeyOf(ChatMessage message) =>
         message.ChatterId.Length > 0 ? message.ChatterId : message.ChatterLogin.ToLowerInvariant();
 
+    public ChatMessage? LatestFrom(string chatterId, string login)
+    {
+        var lowered = login.ToLowerInvariant();
+        lock (_gate)
+        {
+            return _history.LastOrDefault(m => IsAuthor(m, chatterId, lowered));
+        }
+    }
+
     public IReadOnlyList<ChatMessage> HistoryOf(string chatterKey, DateTime? sinceUtc = null)
     {
         lock (_gate)

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using StreamHelper.Api;
+using StreamHelper.Models;
 using StreamHelper.Storage;
 using StreamHelper.Sync;
 
@@ -85,6 +87,8 @@ public sealed class ChatOverlayService : IPositionable
     }
 
     public void RefreshViewers() => _ = _viewers?.RefreshAsync();
+
+    public void ReshowOverGame(IntPtr front) => _window?.ReshowOver(front);
 
     private void WatchViewers(bool shown)
     {
@@ -179,7 +183,7 @@ public sealed class ChatOverlayService : IPositionable
         var window = new ChatOverlayWindow(_settings, _badges, _moderation, _emotes, _votes, _watcher, _chatSend, _present, _previews);
         window.TypingChanged += typing => TypingChanged?.Invoke(typing);
         window.GeometryChanged += window.SaveGeometry;
-        window.HistoryRequested += OnHistoryRequested;
+        window.HistoryRequested += message => _ = OpenHistoryAsync(message);
         window.MessageDeleted += OnChatMessageDeleted;
         _window = window;
         foreach (var message in _feed.Recent())
@@ -192,7 +196,13 @@ public sealed class ChatOverlayService : IPositionable
         return window;
     }
 
-    private async void OnHistoryRequested(ChatMessage message)
+    public static ChatMessage HistorySample(ChatFeed feed, ChatPing ping) =>
+        feed.LatestFrom(ping.ChatterId, ping.Login)
+        ?? new ChatMessage(ping.Key, ping.ChatterId, ping.Login, ping.DisplayName, ping.Message, Array.Empty<ChatMention>(), ping.AtUtc);
+
+    public Task OpenHistoryAsync(ChatPing ping) => OpenHistoryAsync(HistorySample(_feed, ping));
+
+    public async Task OpenHistoryAsync(ChatMessage message)
     {
         DateTime? since = null;
         try
@@ -205,19 +215,26 @@ public sealed class ChatOverlayService : IPositionable
             Log.Write("Stream start failed: " + ex.Message);
         }
 
-        if (_history == null) _historyReturnTo = NativeMethods.GetForegroundWindow();
-        else
+        try
         {
-            var old = _history;
-            _history = null;
-            old.Closed -= OnHistoryClosed;
-            old.Close();
+            if (_history == null) _historyReturnTo = NativeMethods.GetForegroundWindow();
+            else
+            {
+                var old = _history;
+                _history = null;
+                old.Closed -= OnHistoryClosed;
+                old.Close();
+            }
+            var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel,
+                _previews, () => _settings.Current.ChatLinkPreviews);
+            window.Closed += OnHistoryClosed;
+            _history = window;
+            window.Show();
         }
-        var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel,
-            _previews, () => _settings.Current.ChatLinkPreviews);
-        window.Closed += OnHistoryClosed;
-        _history = window;
-        window.Show();
+        catch (Exception ex)
+        {
+            Log.Write("Chat history failed: " + ex.Message);
+        }
     }
 
     private void OnChatMessageDeleted(string messageId) => _feed.MarkDeleted(messageId);

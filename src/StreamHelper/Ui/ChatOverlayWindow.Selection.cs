@@ -41,6 +41,7 @@ public partial class ChatOverlayWindow
         {
             _copiedTimer.Stop();
             CopiedStrip.Visibility = Visibility.Collapsed;
+            UpdatePausedStrip();
         };
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(OnCopyKey);
         Closed += (_, _) => ReleaseCopyKey();
@@ -64,6 +65,7 @@ public partial class ChatOverlayWindow
                 Math.Abs(at.Y - _pressedAt.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _selecting = true;
             Viewport.CaptureMouse();
+            UpdatePausedStrip();
         }
         RestartIdle();
         if (SpotAt(at) is { } spot) _focus = spot;
@@ -175,6 +177,7 @@ public partial class ChatOverlayWindow
         {
             if (line.Selected != null) Paint(line, null);
         }
+        UpdatePausedStrip();
     }
 
     private void ForgetSelectionOf(ChatLine line)
@@ -193,6 +196,7 @@ public partial class ChatOverlayWindow
     {
         if (!ClipboardText.TrySet(text)) return;
         CopiedStrip.Visibility = Visibility.Visible;
+        UpdatePausedStrip();
         _copiedTimer.Stop();
         _copiedTimer.Start();
     }

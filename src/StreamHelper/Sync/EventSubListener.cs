@@ -143,7 +143,7 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         var settings = _settings.Current;
         if (!settings.HasTwitchCredentials || !settings.HasTwitchTokens)
         {
-            return new SyncStatus(SyncState.NotConnected, $"{_feature.Label}: Twitch не подключён. Подключи аккаунт в настройках, вкладка «Twitch».");
+            return new SyncStatus(SyncState.NotConnected, $"{_feature.Label}: Twitch не подключён. Подключи аккаунт в настройках, раздел «Подключения».");
         }
         if (!settings.HasScope(_feature.RequiredScope))
         {

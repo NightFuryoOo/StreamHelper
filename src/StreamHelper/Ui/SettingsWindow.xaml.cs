@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -12,11 +13,16 @@ namespace StreamHelper.Ui;
 
 public partial class SettingsWindow : Window
 {
-    private const int RewardsSection = 5;
+    public const string ConnectionsPage = "connections";
+    public const string EventsPage = "events";
+    public const string RewardsPage = "rewards";
+    public const string ChatPage = "chat";
+    public const string GeneralPage = "general";
 
     private readonly Services _services;
     private readonly List<Action> _unhook = new();
     private bool _loading = true;
+    private string? _page;
 
     public SettingsWindow(Services services)
     {
@@ -54,13 +60,18 @@ public partial class SettingsWindow : Window
         StartLiveWatch();
         Closed += (_, _) => OnClosedCleanup();
 
-        var section = settings.SettingsSection is >= 0 and <= 8 ? settings.SettingsSection : 0;
-        if (!settings.HasAnyDonationSource && !settings.HasTwitchTokens) section = 1;
-        if (TakeProfileNotice()) section = 0;
+        var page = StartPage(settings, TakeProfileNotice());
         _loading = false;
         ApplyHotkeys();
-        SelectSection(section);
-        if (section == RewardsSection) _ = LoadRewardSectionAsync();
+        SelectPage(page);
+        if (page == RewardsPage) _ = LoadRewardSectionAsync();
+    }
+
+    public static string StartPage(AppSettings settings, bool profileNotice)
+    {
+        if (profileNotice) return GeneralPage;
+        if (!settings.HasAnyDonationSource && !settings.HasTwitchTokens) return ConnectionsPage;
+        return settings.SettingsPage is EventsPage or RewardsPage or ChatPage or GeneralPage ? settings.SettingsPage : ConnectionsPage;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -73,10 +84,8 @@ public partial class SettingsWindow : Window
     {
         StopLiveWatch();
         foreach (var unhook in _unhook) unhook();
-        _services.Chat.EndPositioning();
+        StopPositioning();
         _twitchCts?.Cancel();
-        _services.Toasts.EndPositioning();
-        _services.MuteBadge.EndPositioning();
         if (_toastSaveTimer.IsEnabled)
         {
             _toastSaveTimer.Stop();
@@ -105,6 +114,10 @@ public partial class SettingsWindow : Window
             var current = service;
             WatchStatus(DonationServices.Poller(_services, current), status => ApplyTile(current, status));
         }
+        WatchStatus(_services.DaMedia, ApplyVideoState);
+        ShowStatus(DonationsStatusText, DonationsStatusDot, _services.DonationStatus.Combined);
+        Action<SyncStatus> donations = status => Dispatcher.InvokeAsync(() => ShowStatus(DonationsStatusText, DonationsStatusDot, status));
+        Hook(() => _services.DonationStatus.Changed += donations, () => _services.DonationStatus.Changed -= donations);
         WatchStatus(_services.FollowerPoller, status => ShowStatus(FollowersStatusText, FollowersStatusDot, status));
         WatchStatus(_services.SubscriptionListener, status => ShowStatus(SubsStatusText, SubsStatusDot, status));
         WatchStatus(_services.RewardListener, status => ShowStatus(RewardsStatusText, RewardsStatusDot, status));
@@ -141,12 +154,14 @@ public partial class SettingsWindow : Window
         text.Text = Percent(slider);
     }
 
+    public const string PositionText = "Настроить положение и размеры";
+
     private static void TogglePositioning(IPositionable target, Button button)
     {
         if (target.IsPositioning)
         {
             target.EndPositioning();
-            button.Content = "Выбрать положение";
+            button.Content = PositionText;
         }
         else
         {
@@ -155,33 +170,58 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private (IPositionable Target, Button Button)[] Positionables => new (IPositionable, Button)[]
+    {
+        (_services.Chat, ChatPositionButton), (_services.Toasts, ToastPositionButton), (_services.MuteBadge, MuteBadgePositionButton),
+    };
+
+    private void StopPositioning()
+    {
+        foreach (var (target, button) in Positionables)
+        {
+            if (!target.IsPositioning) continue;
+            target.EndPositioning();
+            button.Content = PositionText;
+        }
+    }
+
     private void Reveal(FrameworkElement element) =>
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() => element.BringIntoView()));
 
-    private RadioButton[] SectionTabs => new[] { TabGeneral, TabDonations, TabTwitch, TabFollowers, TabSubscribers, TabRewards, TabPings, TabChat, TabMoments };
-
-    private FrameworkElement[] SectionPanels =>
-        new FrameworkElement[] { SectionGeneral, SectionDonations, SectionTwitch, SectionFollowers, SectionSubscribers, SectionRewards, SectionPings, SectionChat, SectionMoments };
-
-    private void SelectSection(int index)
+    private (RadioButton Nav, FrameworkElement Page)[] Pages => new (RadioButton, FrameworkElement)[]
     {
-        SectionTabs[index].IsChecked = true;
-        ShowSection(index);
+        (NavConnections, PageConnections), (NavEvents, PageEvents), (NavRewards, PageRewards), (NavChat, PageChat), (NavGeneral, PageGeneral),
+    };
+
+    public void GoToPage(string page)
+    {
+        if (Pages.Any(p => (string)p.Nav.Tag == page)) SelectPage(page);
     }
 
-    private void ShowSection(int index)
+    private void OnOpenHelp(object sender, RoutedEventArgs e) => _services.OpenHelp();
+
+    private void SelectPage(string page)
     {
-        var panels = SectionPanels;
-        for (var i = 0; i < panels.Length; i++) panels[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
-        if (index == RewardsSection && !_loading) _ = LoadRewardSectionAsync();
+        foreach (var (nav, _) in Pages)
+        {
+            if ((string)nav.Tag == page) nav.IsChecked = true;
+        }
+        ShowPage(page);
+    }
+
+    private void ShowPage(string page)
+    {
+        if (page != _page) StopPositioning();
+        _page = page;
+        foreach (var (nav, panel) in Pages) panel.Visibility = (string)nav.Tag == page ? Visibility.Visible : Visibility.Collapsed;
+        if (page == RewardsPage && !_loading) _ = LoadRewardSectionAsync();
     }
 
     private void OnSectionChecked(object sender, RoutedEventArgs e)
     {
-        if (_loading) return;
-        if (sender is not RadioButton { Tag: string tag } || !int.TryParse(tag, out var index)) return;
-        ShowSection(index);
-        _services.Settings.Current.SettingsSection = index;
+        if (_loading || sender is not RadioButton { Tag: string page }) return;
+        ShowPage(page);
+        _services.Settings.Current.SettingsPage = page;
         _services.Settings.Save();
     }
 

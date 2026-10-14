@@ -25,7 +25,7 @@ public sealed class DonationStatusHub
         {
             return sources.Count == 1
                 ? sources[0].Status
-                : new SyncStatus(SyncState.NotConnected, "Не подключено. Подключи DonationAlerts, DonatePay или DonateX в настройках, вкладка «Донаты».");
+                : new SyncStatus(SyncState.NotConnected, "Не подключено. Подключи DonationAlerts, DonatePay или DonateX в настройках, раздел «Подключения».");
         }
 
         bool NamesNeeded(string name) => active.Count > 1 || name != sources[0].Name;

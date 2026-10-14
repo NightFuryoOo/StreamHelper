@@ -153,7 +153,7 @@ public partial class EmotePickerWindow : Window
         }
         var total = shelves.Sum(s => s.Emotes.Count);
         ShowStatus(library.All.Count == 0
-            ? library.IsLoading ? "Загружаю смайлы…" : "Смайлов нет: подключи Twitch во вкладке «Twitch»."
+            ? library.IsLoading ? "Загружаю смайлы…" : "Смайлов нет: подключи Twitch в настройках, раздел «Подключения»."
             : total == 0 ? "Ничего не нашлось."
             : total > shown ? $"Показаны первые {shown}: уточни поиск."
             : !_settings.Current.HasEmotesScope ? "Свои смайлы с других каналов появятся после переподключения Twitch."

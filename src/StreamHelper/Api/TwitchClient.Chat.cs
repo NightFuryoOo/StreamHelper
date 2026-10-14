@@ -31,7 +31,7 @@ public sealed partial class TwitchClient
 {
     public async Task<ChatSendResult> SendChatMessageAsync(string text, string? replyToMessageId, CancellationToken ct)
     {
-        if (!Settings.HasChatWriteScope) return new ChatSendResult(false, "Чтобы писать в чат, переподключи Twitch во вкладке «Twitch»: нужно новое право.");
+        if (!Settings.HasChatWriteScope) return new ChatSendResult(false, "Чтобы писать в чат, переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.");
         var message = text.Trim();
         if (message.Length == 0) return new ChatSendResult(false, "");
         if (message.Length > MaxChatMessage) return new ChatSendResult(false, $"Слишком длинное сообщение: Twitch принимает до {MaxChatMessage} знаков.");
@@ -116,7 +116,7 @@ public sealed partial class TwitchClient
 
     public async Task<IReadOnlyList<ChatterInfo>> GetChattersAsync(CancellationToken ct)
     {
-        if (!Settings.HasChattersScope) throw new AuthRequiredException("Чтобы подсказывать всех зрителей в чате, переподключи Twitch во вкладке «Twitch»: нужно новое право.");
+        if (!Settings.HasChattersScope) throw new AuthRequiredException("Чтобы подсказывать всех зрителей в чате, переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.");
         var all = new List<ChatterInfo>();
         string? cursor = null;
         for (var page = 0; page < MaxChatterPages; page++)

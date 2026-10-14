@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:StreamHelper.Ui"
-        Title="StreamHelper — настройки" Icon="/app_icon.ico" Width="560" Height="700" MinWidth="500" MinHeight="440"
+        Title="StreamHelper — настройки" Icon="/app_icon.ico" Width="900" Height="720" MinWidth="760" MinHeight="460"
         WindowStartupLocation="CenterScreen" ResizeMode="CanResize"
         Background="#1B1D23" Foreground="{StaticResource TextBrush}"
         FontFamily="Segoe UI" FontSize="13">
@@ -56,7 +56,8 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-        </Style>        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+        </Style>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="#262A33"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
@@ -72,23 +73,159 @@
             <Setter Property="Padding" Value="6,5"/>
         </Style>
 
-        <Style x:Key="ServiceTile" TargetType="Button">
+        <Style x:Key="SwitchCheck" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="Width" Value="96"/>
-            <Setter Property="Height" Value="82"/>
-            <Setter Property="Margin" Value="0,10,10,0"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="36" Height="20" VerticalAlignment="Top">
+                                <Border x:Name="track" Width="34" Height="18" CornerRadius="9" Background="#3A3F4B"
+                                        BorderBrush="Transparent" BorderThickness="1"/>
+                                <Ellipse x:Name="knob" Width="14" Height="14" Fill="#C9CDD6" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+                            </Grid>
+                            <ContentPresenter Grid.Column="1" Margin="10,1,0,0" VerticalAlignment="Top" RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="track" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="knob" Property="Fill" Value="White"/>
+                                <Setter TargetName="knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="knob" Property="Margin" Value="0,0,3,0"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="track" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="track" Property="BorderBrush" Value="#8CC0FF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NotifyChip" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#A9AFBC"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="bd" Background="Transparent" BorderBrush="#3A3F4B" BorderThickness="1" CornerRadius="11" Padding="10,3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#8CC0FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EyeToggle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="6" Width="32" Height="28" BorderBrush="Transparent" BorderThickness="1">
+                            <Viewbox Width="20" Height="20">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M2,12 C2,12 6,5 12,5 C18,5 22,12 22,12 C22,12 18,19 12,19 C6,19 2,12 2,12 Z M12,9 A3,3 0 1 1 12,15 A3,3 0 1 1 12,9 Z"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}" StrokeThickness="1.7"
+                                          StrokeLineJoin="Round"/>
+                                    <Path x:Name="slash" Data="M4,4 L20,20" Stroke="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"
+                                          StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="False">
+                                <Setter TargetName="slash" Property="Visibility" Value="Visible"/>
+                                <Setter Property="Foreground" Value="#6B7180"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#22FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#8CC0FF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+        <Style x:Key="ExpanderButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="#262A33" BorderBrush="#3A3F4B" BorderThickness="1" CornerRadius="10">
-                            <ContentPresenter/>
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="8" Padding="16,12" BorderBrush="Transparent" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Stretch"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#14FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#8CC0FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ServiceTile" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="#1B1D23" BorderBrush="#3A3F4B" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <ContentPresenter HorizontalAlignment="Stretch"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter TargetName="bd" Property="Background" Value="#2B303B"/>
+                                <Setter TargetName="bd" Property="Background" Value="#20242C"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -97,7 +234,7 @@
         </Style>
         <Style x:Key="ChoiceChip" TargetType="RadioButton">
             <Setter Property="Foreground" Value="#B7BDCB"/>
-            <Setter Property="Background" Value="#323744"/>
+            <Setter Property="Background" Value="#2E3340"/>
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="Margin" Value="0,6,6,0"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -121,842 +258,1162 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="TableRow" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#2E333E"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Padding" Value="16,9"/>
+        </Style>
+        <Style x:Key="ColHead" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Height" Value="8"/>
+            <Setter Property="Fill" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="Margin" Value="0,5,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style x:Key="TestButton" TargetType="Button" BasedOn="{StaticResource SoftButton}">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="Margin" Value="0,10,0,3"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
-        <Style x:Key="Heading" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
-        <Style x:Key="SectionPanel" TargetType="StackPanel">
-            <Setter Property="Margin" Value="22,16,22,16"/>
+        <Style x:Key="Page" TargetType="StackPanel">
+            <Setter Property="Margin" Value="26,22,26,26"/>
             <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
     </Window.Resources>
 
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="210"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Padding="14,10,14,8" BorderBrush="#3A3F4B" BorderThickness="0,0,0,1">
-            <WrapPanel>
-                <RadioButton x:Name="TabGeneral" Style="{StaticResource TabButton}" GroupName="sections" Tag="0"
-                             Content="Общие" AutomationProperties.Name="Общие" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabDonations" Style="{StaticResource TabButton}" GroupName="sections" Tag="1" Margin="2,0,0,0"
-                             Content="Донаты" AutomationProperties.Name="Донаты" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabTwitch" Style="{StaticResource TabButton}" GroupName="sections" Tag="2" Margin="2,0,0,0"
-                             Content="Twitch" AutomationProperties.Name="Twitch" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabFollowers" Style="{StaticResource TabButton}" GroupName="sections" Tag="3" Margin="2,0,0,0"
-                             Content="Фолловеры" AutomationProperties.Name="Фолловеры" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabSubscribers" Style="{StaticResource TabButton}" GroupName="sections" Tag="4" Margin="2,0,0,0"
-                             Content="Подписки" AutomationProperties.Name="Подписки" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabRewards" Style="{StaticResource TabButton}" GroupName="sections" Tag="5" Margin="2,0,0,0"
-                             Content="Награды" AutomationProperties.Name="Награды" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabPings" Style="{StaticResource TabButton}" GroupName="sections" Tag="6" Margin="2,0,0,0"
-                             Content="Пинги" AutomationProperties.Name="Пинги" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabMoments" Style="{StaticResource TabButton}" GroupName="sections" Tag="8" Margin="2,0,0,0"
-                             Content="Рейды и стрики" AutomationProperties.Name="Рейды и стрики" Checked="OnSectionChecked"/>
-                <RadioButton x:Name="TabChat" Style="{StaticResource TabButton}" GroupName="sections" Tag="7" Margin="2,0,0,0"
-                             Content="Чат" AutomationProperties.Name="Чат" Checked="OnSectionChecked"/>
-            </WrapPanel>
+        <Border Grid.Column="0" BorderBrush="#2A2E37" BorderThickness="0,0,1,0" Padding="10,14,10,14">
+            <DockPanel LastChildFill="False">
+                <Button x:Name="HelpButton" DockPanel.Dock="Bottom" Style="{StaticResource NavLinkButton}" AutomationProperties.Name="Что умеет программа"
+                        ToolTip="Справка обо всём, что умеет StreamHelper" Click="OnOpenHelp">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                            <Canvas Width="24" Height="24">
+                                <Path Data="M12,3 A9,9 0 1 1 12,21 A9,9 0 1 1 12,3 M9.6,9.4 A2.5,2.5 0 1 1 13,11.8 C12.3,12.1 12,12.6 12,13.3 V13.6 M12,17 V17.01"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Text="Что умеет программа" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <StackPanel DockPanel.Dock="Top">
+                    <RadioButton x:Name="NavConnections" Style="{StaticResource NavButton}" GroupName="pages" Tag="connections"
+                                 AutomationProperties.Name="Подключения" Checked="OnSectionChecked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M9,2 V7 M15,2 V7 M6,7 H18 V11 A6,6 0 0 1 6,11 Z M12,17 V22"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Подключения" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavEvents" Style="{StaticResource NavButton}" GroupName="pages" Tag="events"
+                                 AutomationProperties.Name="События" Checked="OnSectionChecked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M6,16 V11 A6,6 0 0 1 18,11 V16 L20,18 H4 Z M10,21 A2,2 0 0 0 14,21"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="События" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavRewards" Style="{StaticResource NavButton}" GroupName="pages" Tag="rewards"
+                                 AutomationProperties.Name="Награды" Checked="OnSectionChecked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M4,11 H20 V21 H4 Z M3,7 H21 V11 H3 Z M12,7 V21 M12,7 C10,3 6.5,4 7.5,7 M12,7 C14,3 17.5,4 16.5,7"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Награды" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavChat" Style="{StaticResource NavButton}" GroupName="pages" Tag="chat"
+                                 AutomationProperties.Name="Чат" Checked="OnSectionChecked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M4,5 H20 V16 H9 L4,20 Z"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Чат" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavGeneral" Style="{StaticResource NavButton}" GroupName="pages" Tag="general"
+                                 AutomationProperties.Name="Общие" Checked="OnSectionChecked">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="18" Height="18" Margin="0,0,10,0">
+                                <Canvas Width="24" Height="24">
+                                    <Path Data="M4,7 H13 M19,7 H20 M4,17 H7 M13,17 H20 M16,4.5 A2.5,2.5 0 1 1 16,9.5 A2.5,2.5 0 1 1 16,4.5 M10,14.5 A2.5,2.5 0 1 1 10,19.5 A2.5,2.5 0 1 1 10,14.5"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.7"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Общие" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </RadioButton>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <ui:UpdateBanner x:Name="UpdateBannerView" Grid.Row="1" Margin="14,10,14,0"/>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <Grid>
+            <ui:UpdateBanner x:Name="UpdateBannerView" Grid.Row="0" Margin="26,14,26,0"/>
+            <TextBlock x:Name="HotkeyHint" Grid.Row="1" Foreground="{StaticResource WarnBrush}" Margin="26,10,26,0" TextWrapping="Wrap"
+                       Visibility="Collapsed"/>
 
-                <StackPanel x:Name="SectionGeneral" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Горячие клавиши" Style="{StaticResource Heading}"/>
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="170"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0" Text="Донаты" VerticalAlignment="Center" Margin="0,0,0,0"/>
-                        <Grid Grid.Row="0" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,0,0,0">
-                            <TextBox x:Name="HotkeyDonationsBox" Tag="Donations" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Donations" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="1" Text="Фолловеры" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="1" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyFollowersBox" Tag="Followers" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Followers" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="2" Text="Подписки" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="2" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeySubscribersBox" Tag="Subscribers" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Subscribers" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="3" Text="Награды" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="3" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyRewardsBox" Tag="Rewards" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Rewards" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="4" Text="Пинги" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="4" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyPingsBox" Tag="Pings" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Pings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="5" Text="Рейды и стрики" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="5" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyMomentsBox" Tag="Moments" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Moments" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="6" Text="Настройки" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="6" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeySettingsBox" Tag="Settings" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="Settings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="7" Text="Скрыть уведомления" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="7" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyHideToastsBox" Tag="HideToasts" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="HideToasts" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="8" Text="Чат: управление мышью" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="8" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyChatBox" Tag="ChatInteract" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="ChatInteract" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="9" Text="Чат: показать / скрыть" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="9" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyChatToggleBox" Tag="ChatToggle" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="ChatToggle" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="10" Text="Чат: написать сообщение" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="10" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyChatWriteBox" Tag="ChatWrite" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="ChatWrite" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                        <TextBlock Grid.Row="11" Text="Звуки наград: выкл / вкл" VerticalAlignment="Center" Margin="0,6,0,0"/>
-                        <Grid Grid.Row="11" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
-                            <TextBox x:Name="HotkeyRewardSoundsBox" Tag="RewardSoundsMute" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Tag="RewardSoundsMute" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
-                        </Grid>
-                    </Grid>
-                    <TextBlock x:Name="HotkeyHint" Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <Grid>
 
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
+                    <StackPanel x:Name="PageConnections" Style="{StaticResource Page}">
+                        <TextBlock Text="Подключения" Style="{StaticResource PageTitle}"/>
+                        <TextBlock Text="Откуда программа берёт события и чат." Style="{StaticResource PageSub}"/>
 
-                    <TextBlock Text="Окно уведомления" Style="{StaticResource Heading}"/>
-                    <CheckBox x:Name="ToastCheck" Content="Всплывающее уведомление, когда окно скрыто" Margin="0,10,0,0" Click="OnOptionsChanged"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <DockPanel LastChildFill="True">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <Button x:Name="TwitchConnectButton" Style="{StaticResource PrimaryButton}" Content="Подключить Twitch"
+                                                Click="OnTwitchConnect"/>
+                                        <Button x:Name="TwitchDisconnectButton" Style="{StaticResource FlatButton}" Content="Отключить" Margin="6,0,0,0"
+                                                Click="OnTwitchDisconnect"/>
+                                    </StackPanel>
+                                    <Viewbox DockPanel.Dock="Left" Width="22" Height="22" VerticalAlignment="Top" Margin="0,1,10,0">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Data="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z" Fill="#A970FF"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Text="Twitch" Style="{StaticResource CardTitle}"/>
+                                        <DockPanel Margin="0,4,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="TwitchStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="TwitchStatusText" Text="Twitch не подключён." TextWrapping="Wrap" FontSize="12"/>
+                                        </DockPanel>
+                                    </StackPanel>
+                                </DockPanel>
+                                <TextBlock x:Name="TwitchRightsText" Foreground="{StaticResource WarnBrush}" Margin="32,6,0,0" TextWrapping="Wrap" FontSize="12"
+                                           Visibility="Collapsed"/>
 
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Прозрачность" VerticalAlignment="Center"/>
-                        <Slider x:Name="ToastOpacitySlider" Grid.Column="1" Minimum="20" Maximum="100" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Прозрачность уведомления" ValueChanged="OnToastSliderChanged"/>
-                        <TextBlock x:Name="ToastOpacityText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Размер" VerticalAlignment="Center"/>
-                        <Slider x:Name="ToastScaleSlider" Grid.Column="1" Minimum="60" Maximum="200" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Размер уведомления" ValueChanged="OnToastSliderChanged"/>
-                        <TextBlock x:Name="ToastScaleText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Время показа" VerticalAlignment="Center"/>
-                        <Slider x:Name="ToastSecondsSlider" Grid.Column="1" Minimum="2" Maximum="60" TickFrequency="1"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Время показа уведомления" ValueChanged="OnToastSliderChanged"/>
-                        <TextBlock x:Name="ToastSecondsText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <Button Style="{StaticResource PrimaryButton}" Content="Показать пример" Click="OnToastSample"/>
-                        <Button x:Name="ToastPositionButton" Style="{StaticResource PrimaryButton}" Content="Выбрать положение"
-                                Margin="8,0,0,0" Click="OnToastPosition"/>
-                        <Button Style="{StaticResource FlatButton}" Content="Сбросить положение" Margin="8,0,0,0"
-                                Click="OnToastResetPosition"/>
-                    </StackPanel>
-
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
-
-                    <TextBlock Text="Вкладки" Style="{StaticResource Heading}"/>
-                    <WrapPanel x:Name="TabChecks" Margin="0,6,0,0"/>
-                    <TextBlock Text="Снятая вкладка пропадает из главного окна, её клавиша не работает. События и уведомления идут как раньше, их выключают галочки «Уведомлять»."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
-
-                    <StackPanel x:Name="VersionBlock">
-                        <TextBlock Text="Версия программы" Style="{StaticResource Heading}"/>
-                        <TextBlock Text="{Binding CurrentText}" Margin="0,8,0,0"/>
-                        <TextBlock Text="{Binding AvailableText}" Foreground="{StaticResource AccentBrush}" Margin="0,2,0,0"
-                                   Visibility="{Binding HasAvailable, Converter={StaticResource BoolVis}}"/>
-                        <Button Style="{StaticResource PrimaryButton}" Content="Выбрать версию…" HorizontalAlignment="Left" Margin="0,10,0,0"
-                                Click="OnChooseVersion"/>
-                    </StackPanel>
-
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
-
-                    <TextBlock Text="Профиль" Style="{StaticResource Heading}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                        <Button Style="{StaticResource PrimaryButton}" Content="Сохранить профиль" Click="OnSaveProfile"/>
-                        <Button Style="{StaticResource PrimaryButton}" Content="Загрузить профиль" Margin="8,0,0,0" Click="OnLoadProfile"/>
-                    </StackPanel>
-                    <CheckBox x:Name="ProfileListsCheck" Content="Включить списки (донаты, заказы наград и т.д.)" Margin="0,10,0,0"/>
-                    <StackPanel x:Name="ProfileConfirmPanel" Visibility="Collapsed" Margin="0,8,0,0">
-                        <TextBlock x:Name="ProfileConfirmText" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Style="{StaticResource PrimaryButton}" Content="Загрузить и перезапустить" Padding="14,5"
-                                    Click="OnConfirmLoadProfile"/>
-                            <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0" Click="OnCancelLoadProfile"/>
-                        </StackPanel>
-                    </StackPanel>
-                    <TextBlock x:Name="ProfileStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
-                    <Button x:Name="ProfileShowFileButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
-                            Visibility="Collapsed" Click="OnShowProfileFile"/>
-
-                </StackPanel>
-
-                <StackPanel x:Name="SectionDonations" Style="{StaticResource SectionPanel}">
-                    <WrapPanel>
-                        <Button x:Name="TileDonationAlerts" Style="{StaticResource ServiceTile}" Tag="DonationAlerts" Click="OnServiceTileClick"
-                                AutomationProperties.Name="DonationAlerts">
-                            <Grid>
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Image x:Name="LogoDonationAlerts" Source="/Assets/donationalerts.png" Width="36" Height="36" Opacity="0.45"
-                                           RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="DonationAlerts" Margin="0,7,0,0" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                                <StackPanel x:Name="TwitchCodePanel" Visibility="Collapsed" Margin="32,12,0,0">
+                                    <TextBlock Text="Код для подтверждения на странице Twitch" Style="{StaticResource Label}" Margin="0,0,0,3"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="TwitchCodeBox" IsReadOnly="True" FontSize="18" FontWeight="SemiBold" Width="170"/>
+                                        <Button Style="{StaticResource FlatButton}" Content="Копировать" Margin="8,0,0,0" Click="OnCopyTwitchCode"/>
+                                    </StackPanel>
                                 </StackPanel>
-                                <Border x:Name="BadgeDonationAlerts" Width="18" Height="18" CornerRadius="9" HorizontalAlignment="Right"
-                                        VerticalAlignment="Top" Margin="0,6,6,0" Visibility="Collapsed">
-                                    <TextBlock x:Name="MarkDonationAlerts" Text="✓" Foreground="White" FontWeight="Bold" FontSize="11"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </Grid>
-                        </Button>
-                        <Button x:Name="TileDonatePay" Style="{StaticResource ServiceTile}" Tag="DonatePay" Click="OnServiceTileClick"
-                                AutomationProperties.Name="DonatePay">
-                            <Grid>
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Image x:Name="LogoDonatePay" Source="/Assets/donatepay.png" Width="36" Height="36" Opacity="0.45"
-                                           RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="DonatePay" Margin="0,7,0,0" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
-                                </StackPanel>
-                                <Border x:Name="BadgeDonatePay" Width="18" Height="18" CornerRadius="9" HorizontalAlignment="Right"
-                                        VerticalAlignment="Top" Margin="0,6,6,0" Visibility="Collapsed">
-                                    <TextBlock x:Name="MarkDonatePay" Text="✓" Foreground="White" FontWeight="Bold" FontSize="11"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </Grid>
-                        </Button>
-                        <Button x:Name="TileDonateX" Style="{StaticResource ServiceTile}" Tag="DonateX" Click="OnServiceTileClick"
-                                AutomationProperties.Name="DonateX">
-                            <Grid>
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Image x:Name="LogoDonateX" Source="/Assets/donatex.png" Width="36" Height="36" Opacity="0.45"
-                                           RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="DonateX" Margin="0,7,0,0" HorizontalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
-                                </StackPanel>
-                                <Border x:Name="BadgeDonateX" Width="18" Height="18" CornerRadius="9" HorizontalAlignment="Right"
-                                        VerticalAlignment="Top" Margin="0,6,6,0" Visibility="Collapsed">
-                                    <TextBlock x:Name="MarkDonateX" Text="✓" Foreground="White" FontWeight="Bold" FontSize="11"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                            </Grid>
-                        </Button>
-                    </WrapPanel>
 
-                    <Button Style="{StaticResource SoftButton}" Content="Тестовый донат" HorizontalAlignment="Left" Margin="0,12,0,0"
-                            AutomationProperties.Name="Добавить тестовый донат" Click="OnAddTestDonation"/>
-                </StackPanel>
+                                <DockPanel x:Name="ChannelSummary" Margin="32,10,0,0" LastChildFill="True" Visibility="Collapsed">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Сменить в «Чате»" VerticalAlignment="Center"
+                                            AutomationProperties.Name="Сменить канал в разделе «Чат»" Click="OnGoToChannelChoice"/>
+                                    <TextBlock VerticalAlignment="Center" FontSize="12" TextWrapping="Wrap">
+                                        <Run Text="Канал:" Foreground="{StaticResource MutedBrush}"/> <Run x:Name="ChannelSummaryText"/>
+                                    </TextBlock>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
 
-                <StackPanel x:Name="SectionTwitch" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Twitch" Style="{StaticResource Heading}"/>
-
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Ellipse x:Name="TwitchStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,4,8,0" VerticalAlignment="Top"/>
-                        <TextBlock x:Name="TwitchStatusText" Text="Twitch не подключён." TextWrapping="Wrap"/>
-                    </DockPanel>
-                    <TextBlock x:Name="TwitchRightsText" Foreground="{StaticResource WarnBrush}" Margin="17,4,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
-
-                    <StackPanel x:Name="TwitchCodePanel" Visibility="Collapsed" Margin="0,12,0,0">
-                        <TextBlock Text="Код для подтверждения на странице Twitch" Style="{StaticResource Label}" Margin="0,0,0,3"/>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBox x:Name="TwitchCodeBox" IsReadOnly="True" FontSize="18" FontWeight="SemiBold" Width="170"/>
-                            <Button Style="{StaticResource FlatButton}" Content="Копировать" Margin="8,0,0,0" Click="OnCopyTwitchCode"/>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <Button x:Name="TwitchConnectButton" Style="{StaticResource PrimaryButton}" Content="Подключить Twitch"
-                                Click="OnTwitchConnect"/>
-                        <Button Style="{StaticResource FlatButton}" Content="Отключить" Margin="8,0,0,0" Click="OnTwitchDisconnect"/>
-                    </StackPanel>
-
-                    <StackPanel x:Name="ChannelBlock" Margin="0,18,0,0" Visibility="Collapsed">
-                        <DockPanel>
-                            <Button x:Name="ChannelRefreshButton" DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Обновить список"
-                                    Padding="8,0" Click="OnRefreshChannels"/>
-                            <TextBlock Text="Канал" Style="{StaticResource Heading}" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <WrapPanel x:Name="ChannelChoices" Margin="0,2,0,0"/>
-                        <TextBlock x:Name="ModeratedLabel" Text="Где ты модератор" Style="{StaticResource Label}"/>
-                        <WrapPanel x:Name="ModeratedChoices"/>
-                        <TextBlock x:Name="ChannelStatusText" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                        <TextBlock Text="Как зритель" Style="{StaticResource Label}"/>
-                        <WrapPanel x:Name="ViewerChoices"/>
-                        <DockPanel Margin="0,6,0,0">
-                            <Button x:Name="ViewerAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Подключить"
-                                    Margin="8,0,0,0" Click="OnAddViewerChannel"/>
-                            <TextBox x:Name="ViewerChannelInput" AutomationProperties.Name="Ник канала" PreviewKeyDown="OnViewerChannelKeyDown"
-                                     ToolTip="Ник канала или ссылка twitch.tv/…: подключишься к его чату как зритель"/>
-                        </DockPanel>
-                        <TextBlock x:Name="ViewerStatusText" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                        <TextBlock Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
-                                   Text="Где ты модератор: чат поверх игры, бан и мут, удаление сообщений и «Отметить». Как зритель: только чат поверх игры и сообщения в чат. Уведомления (пинги, рейды и стрики, фолловеры), подписки, награды за баллы, опросы и предикты работают только на своём канале."/>
-                    </StackPanel>
-
-                </StackPanel>
-
-                <StackPanel x:Name="SectionFollowers" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Фолловеры" Style="{StaticResource Heading}"/>
-
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестового фолловера" AutomationProperties.Name="Добавить тестового фолловера" Click="OnAddTestFollower"/>
-                        <Ellipse x:Name="FollowersStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="FollowersStatusText" Text="Фолловеры: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    </DockPanel>
-
-                    <CheckBox x:Name="FollowersCheck" Margin="0,10,0,0" Click="OnOptionsChanged"
-                              AutomationProperties.Name="Уведомлять о новых фолловерах">
-                        <TextBlock TextWrapping="Wrap" Text="Уведомлять о новых фолловерах"/>
-                    </CheckBox>
-                </StackPanel>
-
-                <StackPanel x:Name="SectionSubscribers" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Подписки" Style="{StaticResource Heading}"/>
-
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовую подписку" AutomationProperties.Name="Добавить тестовую подписку" Click="OnAddTestSubscriber"/>
-                        <Ellipse x:Name="SubsStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="SubsStatusText" Text="Подписки: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    </DockPanel>
-
-                    <CheckBox x:Name="SubscribersCheck" Margin="0,10,0,0" Click="OnOptionsChanged"
-                              AutomationProperties.Name="Уведомлять о новых подписках">
-                        <TextBlock TextWrapping="Wrap" Text="Уведомлять о новых подписках"/>
-                    </CheckBox>
-
-                    <DockPanel Margin="0,10,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест Bits" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовые Bits" AutomationProperties.Name="Тест Bits"
-                                Click="OnAddTestBits"/>
-                        <CheckBox x:Name="BitsCheck" VerticalAlignment="Center" AutomationProperties.Name="Уведомлять о Bits"
-                                  Checked="OnOptionsChanged" Unchecked="OnOptionsChanged">
-                            <TextBlock TextWrapping="Wrap" Text="Уведомлять о Bits"/>
-                        </CheckBox>
-                    </DockPanel>
-                    <TextBlock Text="Bits и Power-ups за Bits приходят во вкладку «Подписки», только на своём канале."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
-
-                <StackPanel x:Name="SectionRewards" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Награды за баллы канала" Style="{StaticResource Heading}"/>
-
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовую награду" AutomationProperties.Name="Добавить тестовую награду" Click="OnAddTestRedemption"/>
-                        <Ellipse x:Name="RewardsStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="RewardsStatusText" Text="Награды: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    </DockPanel>
-
-                    <CheckBox x:Name="RewardsCheck" Margin="0,10,0,0" Click="OnOptionsChanged"
-                              AutomationProperties.Name="Уведомлять о наградах за баллы">
-                        <TextBlock TextWrapping="Wrap" Text="Уведомлять о наградах за баллы"/>
-                    </CheckBox>
-
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
-
-                    <TextBlock Text="Управление наградами" Style="{StaticResource Heading}"/>
-                    <WrapPanel Margin="0,10,0,0">
-                        <Button x:Name="RewardCreateButton" Style="{StaticResource PrimaryButton}" Content="Создать награду"
-                                Margin="0,0,8,8" Click="OnCreateRewardClick"/>
-                        <Button x:Name="RewardsSyncButton" Style="{StaticResource PrimaryButton}" Content="Синхронизировать награды"
-                                Margin="0,0,8,8" Click="OnSyncRewards"/>
-                        <Button x:Name="RewardIconsButton" Style="{StaticResource PrimaryButton}" Content="Сохранить иконки наград за баллы"
-                                Margin="0,0,8,8" Click="OnSaveRewardIcons"/>
-                    </WrapPanel>
-                    <TextBlock x:Name="RewardsSyncStatus" Style="{StaticResource Label}" Margin="0,8,0,0"/>
-
-                    <CheckBox x:Name="OnlyOwnRewardsCheck" Content="Показывать только награды, созданные программой" Margin="0,10,0,0"
-                              Checked="OnOnlyOwnRewardsChanged" Unchecked="OnOnlyOwnRewardsChanged"/>
-                    <TextBlock Text="Без галочки у награды нет уведомления и записи в списке «Награды», звук алёрта будет проигрываться." Foreground="{StaticResource MutedBrush}"
-                               Margin="0,6,0,0" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="RewardsTwitchNote" Text="Награды, созданные Twitch, нельзя принять или отклонить с помощью программы в меню «Награды»."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                    <TextBlock x:Name="RewardsShowStatus" Foreground="{StaticResource MutedBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
-                    <Border x:Name="RewardsShowPanel" Background="{StaticResource CardBrush}" CornerRadius="8" Padding="12,6,6,8"
-                            Margin="0,10,0,0" Visibility="Collapsed">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="76"/>
-                                    <ColumnDefinition Width="84"/>
-                                    <ColumnDefinition Width="30"/>
-                                    <ColumnDefinition Width="34"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Награда" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
-                                <TextBlock Grid.Column="1" Text="На канале" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="Уведомлять" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center"/>
-                            </Grid>
-                            <ItemsControl x:Name="RewardsShowList">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,3,0,0">
-                                            <Grid MinHeight="26" Visibility="{Binding NotConfirming, Converter={StaticResource BoolVis}}">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="76"/>
-                                                    <ColumnDefinition Width="84"/>
-                                                    <ColumnDefinition Width="30"/>
-                                                    <ColumnDefinition Width="34"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding DisplayText}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Enabled}" Value="False">
-                                                                    <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <Button Grid.Column="1" Style="{StaticResource SwitchButton}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                        Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}" IsEnabled="{Binding NotBusy}"
-                                                        AutomationProperties.Name="{Binding SwitchName}" Click="OnToggleRewardEnabledClick"
-                                                        ToolTip="Включить или выключить награду на канале: выключенную зрители не видят и не могут заказать"/>
-                                                <CheckBox Grid.Column="2" IsChecked="{Binding Shown, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                          Margin="10,0,0,0" AutomationProperties.Name="{Binding Name}" Click="OnRewardShownClick"
-                                                          ToolTip="Уведомлять и записывать в список «Награды»"/>
-                                                <Button Grid.Column="3" Style="{StaticResource FlatButton}" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                        Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}" IsEnabled="{Binding NotBusy}"
-                                                        ToolTip="Изменить награду: название, цена, описание, ограничения" AutomationProperties.Name="{Binding EditName}" Click="OnEditRewardClick">
-                                                    <Path Data="M10.5,2.8 L13.2,5.5 L5.6,13.1 L2.6,13.4 L2.9,10.4 Z M9.2,4.1 L11.9,6.8"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
-                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                                          Width="16" Height="16" Stretch="None"/>
-                                                </Button>
-                                                <Button Grid.Column="4" Style="{StaticResource FlatButton}" Foreground="{StaticResource DangerBrush}" Padding="5"
-                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                        Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}"
-                                                        ToolTip="Удалить награду с канала" AutomationProperties.Name="{Binding DeleteName}" Click="OnDeleteManagedClick">
-                                                    <Path Data="M3.5,5 H12.5 M6.5,5 V3.5 H9.5 V5 M4.8,5 L5.4,13 H10.6 L11.2,5 M7,7.5 V11 M9,7.5 V11"
-                                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
-                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                                          Width="16" Height="16" Stretch="None"/>
-                                                </Button>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Донаты" Style="{StaticResource CardTitle}"/>
+                                <Grid Margin="0,10,-10,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="TileDonationAlerts" Grid.Column="0" Style="{StaticResource ServiceTile}" Tag="DonationAlerts" Click="OnServiceTileClick"
+                                            AutomationProperties.Name="DonationAlerts">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Left" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,10,0">
+                                                <Image x:Name="LogoDonationAlerts" Source="/Assets/donationalerts.png" Width="32" Height="32" Opacity="0.45"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <Border x:Name="BadgeDonationAlerts" Width="17" Height="17" CornerRadius="8.5" BorderBrush="#1B1D23" BorderThickness="2"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-6,-6,0" Visibility="Collapsed">
+                                                    <TextBlock x:Name="MarkDonationAlerts" Text="✓" Foreground="White" FontWeight="Bold" FontSize="9"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
                                             </Grid>
-                                            <StackPanel Margin="0,4,0,4" Visibility="{Binding Confirming, Converter={StaticResource BoolVis}}">
-                                                <TextBlock Text="{Binding ConfirmText}" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
-                                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                                                    <Button Style="{StaticResource PrimaryButton}" Content="Да, удалить" Padding="14,5"
-                                                            Background="{StaticResource DangerBrush}" Click="OnConfirmDeleteManaged"/>
-                                                    <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0"
-                                                            Click="OnCancelDeleteManaged"/>
+                                            <StackPanel>
+                                                <TextBlock Text="DonationAlerts" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <Ellipse x:Name="StateDotDonationAlerts" Width="8" Height="8" Fill="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock x:Name="StateTextDonationAlerts" Text="Не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+                                                </StackPanel>
+                                                <TextBlock x:Name="VideoStateDonationAlerts" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,3,0,0"
+                                                           TextWrapping="Wrap" Visibility="Collapsed"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+                                    <Button x:Name="TileDonatePay" Grid.Column="1" Style="{StaticResource ServiceTile}" Tag="DonatePay" Click="OnServiceTileClick"
+                                            AutomationProperties.Name="DonatePay">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Left" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,10,0">
+                                                <Image x:Name="LogoDonatePay" Source="/Assets/donatepay.png" Width="32" Height="32" Opacity="0.45"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <Border x:Name="BadgeDonatePay" Width="17" Height="17" CornerRadius="8.5" BorderBrush="#1B1D23" BorderThickness="2"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-6,-6,0" Visibility="Collapsed">
+                                                    <TextBlock x:Name="MarkDonatePay" Text="✓" Foreground="White" FontWeight="Bold" FontSize="9"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                            <StackPanel>
+                                                <TextBlock Text="DonatePay" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <Ellipse x:Name="StateDotDonatePay" Width="8" Height="8" Fill="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock x:Name="StateTextDonatePay" Text="Не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
                                                 </StackPanel>
                                             </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+                                    <Button x:Name="TileDonateX" Grid.Column="2" Style="{StaticResource ServiceTile}" Tag="DonateX" Click="OnServiceTileClick"
+                                            AutomationProperties.Name="DonateX">
+                                        <DockPanel LastChildFill="True">
+                                            <Grid DockPanel.Dock="Left" Width="32" Height="32" VerticalAlignment="Top" Margin="0,0,10,0">
+                                                <Image x:Name="LogoDonateX" Source="/Assets/donatex.png" Width="32" Height="32" Opacity="0.45"
+                                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                <Border x:Name="BadgeDonateX" Width="17" Height="17" CornerRadius="8.5" BorderBrush="#1B1D23" BorderThickness="2"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-6,-6,0" Visibility="Collapsed">
+                                                    <TextBlock x:Name="MarkDonateX" Text="✓" Foreground="White" FontWeight="Bold" FontSize="9"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                            <StackPanel>
+                                                <TextBlock Text="DonateX" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <Ellipse x:Name="StateDotDonateX" Width="8" Height="8" Fill="{StaticResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                    <TextBlock x:Name="StateTextDonateX" Text="Не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+                                </Grid>
+                                <Button Style="{StaticResource SoftButton}" Content="Тестовый донат" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                        AutomationProperties.Name="Добавить тестовый донат" Click="OnAddTestDonation"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PageEvents" Style="{StaticResource Page}">
+                        <TextBlock Text="События" Style="{StaticResource PageTitle}"/>
+                        <TextBlock Text="Что приходит в главное окно и всплывает уведомлением. Одна строка — одна вкладка главного окна."
+                                   Style="{StaticResource PageSub}"/>
+
+                        <Border Style="{StaticResource Card}" Padding="0,4">
+                            <StackPanel>
+                                <Grid Margin="16,8,16,7">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="160"/>
+                                        <ColumnDefinition Width="74"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Вкладка" Style="{StaticResource ColHead}"/>
+                                    <TextBlock Grid.Column="1" Text="Видна" Style="{StaticResource ColHead}"/>
+                                    <TextBlock Grid.Column="2" Text="Уведомлять" Style="{StaticResource ColHead}"/>
+                                    <TextBlock Grid.Column="3" Text="Клавиша" Style="{StaticResource ColHead}"/>
+                                </Grid>
+
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Донаты" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="TabEyeDonations" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <TextBlock Grid.Column="2" Text="всегда" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center"
+                                                   ToolTip="О донатах программа уведомляет всегда"/>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeyDonationsBox" Tag="Donations" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Донаты»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Donations" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
                                         </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </Border>
-                    <Button x:Name="DeleteAllButton" Style="{StaticResource SoftButton}" Content="Удалить все копии"
-                            HorizontalAlignment="Left" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0"
-                            Visibility="Collapsed" Click="OnDeleteAllCopies"/>
-                    <StackPanel x:Name="DeleteAllPanel" Visibility="Collapsed" Margin="0,6,0,0">
-                        <TextBlock x:Name="DeleteAllText" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                            <Button Style="{StaticResource PrimaryButton}" Content="Да, удалить все" Padding="14,5"
-                                    Background="{StaticResource DangerBrush}" Click="OnConfirmDeleteAll"/>
-                            <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0" Click="OnCancelDeleteAll"/>
-                        </StackPanel>
-                    </StackPanel>
+                                        <Button Grid.Column="4" Style="{StaticResource TestButton}" Content="Тест" ToolTip="Добавить тестовый донат"
+                                                AutomationProperties.Name="Добавить тестовый донат" Click="OnAddTestDonation"/>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="DonationsStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="DonationsStatusText" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
 
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Фолловеры" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="TabEyeFollowers" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <CheckBox x:Name="FollowersCheck" Style="{StaticResource NotifyChip}" Content="Уведомлять"
+                                                      AutomationProperties.Name="Уведомлять о новых фолловерах" Click="OnOptionsChanged"/>
+                                        </WrapPanel>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeyFollowersBox" Tag="Followers" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Фолловеры»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Followers" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                        <Button Grid.Column="4" Style="{StaticResource TestButton}" Content="Тест" ToolTip="Добавить тестового фолловера"
+                                                AutomationProperties.Name="Добавить тестового фолловера" Click="OnAddTestFollower"/>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="FollowersStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="FollowersStatusText" Text="Фолловеры: не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
 
-                    <TextBlock Text="Звук заказа награды" Style="{StaticResource Heading}"/>
-                    <TextBlock x:Name="RewardSoundListStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0"
-                               TextWrapping="Wrap" Visibility="Collapsed"/>
-                    <ItemsControl x:Name="RewardSoundList" Margin="0,6,0,0">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <RadioButton GroupName="rewardsound" Style="{StaticResource TabButton}"
-                                             IsChecked="{Binding Picked, Mode=TwoWay}" Checked="OnRewardSoundPicked"
-                                             AutomationProperties.Name="{Binding Name}">
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Подписки" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="TabEyeSubscribers" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <CheckBox x:Name="SubscribersCheck" Style="{StaticResource NotifyChip}" Content="Подписки"
+                                                      AutomationProperties.Name="Уведомлять о новых подписках" Click="OnOptionsChanged"/>
+                                            <CheckBox x:Name="BitsCheck" Style="{StaticResource NotifyChip}" Content="Bits"
+                                                      AutomationProperties.Name="Уведомлять о Bits"
+                                                      ToolTip="Bits и Power-ups за Bits приходят во вкладку «Подписки», только на своём канале."
+                                                      Checked="OnOptionsChanged" Unchecked="OnOptionsChanged"/>
+                                        </WrapPanel>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeySubscribersBox" Tag="Subscribers" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Подписки»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Subscribers" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                        <StackPanel Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource TestButton}" Content="Тест" ToolTip="Добавить тестовую подписку"
+                                                    AutomationProperties.Name="Добавить тестовую подписку" Click="OnAddTestSubscriber"/>
+                                            <Button Style="{StaticResource TestButton}" Content="Bits" Margin="0,4,0,0" ToolTip="Добавить тестовые Bits"
+                                                    AutomationProperties.Name="Тест Bits" Click="OnAddTestBits"/>
+                                        </StackPanel>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="SubsStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="SubsStatusText" Text="Подписки: не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Награды" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="TabEyeRewards" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <CheckBox x:Name="RewardsCheck" Style="{StaticResource NotifyChip}" Content="Уведомлять"
+                                                      AutomationProperties.Name="Уведомлять о наградах за баллы" Click="OnOptionsChanged"/>
+                                        </WrapPanel>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeyRewardsBox" Tag="Rewards" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Награды»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Rewards" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                        <Button Grid.Column="4" Style="{StaticResource TestButton}" Content="Тест" ToolTip="Добавить тестовую награду"
+                                                AutomationProperties.Name="Добавить тестовую награду" Click="OnAddTestRedemption"/>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="RewardsStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="RewardsStatusText" Text="Награды: не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Пинги" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="TabEyePings" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <CheckBox x:Name="PingsCheck" Style="{StaticResource NotifyChip}" Content="Уведомлять"
+                                                      AutomationProperties.Name="Уведомлять о пингах" Click="OnOptionsChanged"/>
+                                        </WrapPanel>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeyPingsBox" Tag="Pings" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Пинги»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Pings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                        <Button Grid.Column="4" Style="{StaticResource TestButton}" Content="Тест" ToolTip="Добавить тестовый пинг"
+                                                AutomationProperties.Name="Добавить тестовый пинг" Click="OnAddTestPing"/>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="PingsStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="PingsStatusText" Text="Пинги: не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource TableRow}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="48"/>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="74"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Рейды и стрики" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                        <CheckBox x:Name="TabEyeMoments" Grid.Column="1" Style="{StaticResource EyeToggle}"/>
+                                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <CheckBox x:Name="RaidsCheck" Style="{StaticResource NotifyChip}" Content="Рейды"
+                                                      AutomationProperties.Name="Уведомлять о рейдах" Click="OnOptionsChanged"/>
+                                            <CheckBox x:Name="StreaksCheck" Style="{StaticResource NotifyChip}" Content="Стрики"
+                                                      AutomationProperties.Name="Уведомлять о стриках"
+                                                      ToolTip="Стрик: зритель отметил в чате, сколько стримов подряд он смотрит." Click="OnOptionsChanged"/>
+                                        </WrapPanel>
+                                        <Grid Grid.Column="3" Width="150" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <TextBox x:Name="HotkeyMomentsBox" Tag="Moments" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша вкладки «Рейды и стрики»" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="Moments" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                        <StackPanel Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource TestButton}" Content="Рейд" ToolTip="Добавить тестовый рейд"
+                                                    AutomationProperties.Name="Добавить тестовый рейд" Click="OnAddTestRaid"/>
+                                            <Button Style="{StaticResource TestButton}" Content="Стрик" Margin="0,4,0,0" ToolTip="Добавить тестовый стрик"
+                                                    AutomationProperties.Name="Добавить тестовый стрик" Click="OnAddTestStreak"/>
+                                        </StackPanel>
+                                        <DockPanel Grid.Row="1" Grid.ColumnSpan="5" Margin="0,6,0,0" LastChildFill="True">
+                                            <Ellipse x:Name="MomentsStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                                            <TextBlock x:Name="MomentsStatusText" Text="Рейды и стрики: не подключено" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Окно уведомления" Style="{StaticResource CardTitle}"/>
+                                <CheckBox x:Name="ToastCheck" Style="{StaticResource SwitchCheck}" Content="Всплывающее уведомление, когда окно скрыто"
+                                          Margin="0,12,0,0" Click="OnOptionsChanged"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="52"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Прозрачность" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ToastOpacitySlider" Grid.Column="1" Minimum="20" Maximum="100" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Прозрачность уведомления" ValueChanged="OnToastSliderChanged"/>
+                                    <TextBlock x:Name="ToastOpacityText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="52"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Размер" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ToastScaleSlider" Grid.Column="1" Minimum="60" Maximum="200" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Размер уведомления" ValueChanged="OnToastSliderChanged"/>
+                                    <TextBlock x:Name="ToastScaleText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="52"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Время показа" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ToastSecondsSlider" Grid.Column="1" Minimum="2" Maximum="60" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Время показа уведомления" ValueChanged="OnToastSliderChanged"/>
+                                    <TextBlock x:Name="ToastSecondsText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <WrapPanel Margin="0,14,0,0">
+                                    <Button Style="{StaticResource PrimaryButton}" Content="Показать пример" Margin="0,0,8,0" Click="OnToastSample"/>
+                                    <Button x:Name="ToastPositionButton" Style="{StaticResource PrimaryButton}" Content="{x:Static ui:SettingsWindow.PositionText}"
+                                            Margin="0,0,8,0" Click="OnToastPosition"/>
+                                    <Button Style="{StaticResource FlatButton}" Content="Сбросить положение" Click="OnToastResetPosition"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Padding="0">
+                            <StackPanel>
+                                <Button x:Name="PingsToggleButton" Style="{StaticResource ExpanderButton}" AutomationProperties.Name="Пинги: слова, боты и цвет"
+                                        Click="OnTogglePings">
                                     <DockPanel LastChildFill="True">
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding SoundText}" Margin="14,0,0,0" MaxWidth="220"
-                                                   FontWeight="Normal" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding HotkeyText}" Margin="14,0,0,0"
-                                                   FontWeight="Normal" Foreground="{StaticResource AccentBrush}"/>
-                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                        <Path DockPanel.Dock="Right" Data="M4.5,6.5 L8,10 L11.5,6.5" Width="16" Height="16" Stretch="None" VerticalAlignment="Center"
+                                              Stroke="#A9AFBC" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <RotateTransform x:Name="PingsChevron" Angle="0"/>
+                                            </Path.RenderTransform>
+                                        </Path>
+                                        <StackPanel>
+                                            <TextBlock Text="Пинги: слова, боты и цвет" Style="{StaticResource CardTitle}"/>
+                                            <TextBlock x:Name="PingsSummary" Style="{StaticResource Note}" Margin="0,3,0,0"/>
+                                        </StackPanel>
                                     </DockPanel>
-                                </RadioButton>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button x:Name="RewardSoundAddButton" Style="{StaticResource FlatButton}" Content="+ Добавить награду"
-                            HorizontalAlignment="Left" Foreground="{StaticResource AccentBrush}" Margin="0,6,0,0"
-                            Click="OnRewardSoundAddToggle"/>
-                    <StackPanel x:Name="RewardSoundAddPanel" Visibility="Collapsed" Margin="0,2,0,0">
-                        <ItemsControl x:Name="RewardSoundAvailableList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <RadioButton GroupName="rewardsoundadd" Style="{StaticResource TabButton}" IsChecked="False"
-                                                 Checked="OnRewardSoundAddPick" AutomationProperties.Name="{Binding Name}">
-                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
-                                    </RadioButton>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                        <Button x:Name="RewardAlertChooseButton" Style="{StaticResource PrimaryButton}" Content="Выбрать файл"
-                                Click="OnRewardAlertChoose"/>
-                        <Button x:Name="RewardAlertTestButton" Style="{StaticResource FlatButton}" Content="Проверить" Margin="8,0,0,0"
-                                Click="OnRewardAlertTest"/>
-                        <Button x:Name="RewardAlertClearButton" Style="{StaticResource FlatButton}" Content="Убрать" Margin="4,0,0,0"
-                                Foreground="{StaticResource DangerBrush}" Click="OnRewardAlertClear"/>
-                    </StackPanel>
-                    <TextBlock x:Name="RewardAlertStatus" Foreground="{StaticResource WarnBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Громкость" VerticalAlignment="Center"/>
-                        <Slider x:Name="RewardAlertVolumeSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Громкость звука заказа" ValueChanged="OnRewardAlertVolumeChanged"/>
-                        <TextBlock x:Name="RewardAlertVolumeText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Клавиша" VerticalAlignment="Center"/>
-                        <Grid Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="8,0,0,0">
-                            <TextBox x:Name="RewardAlertHotkeyBox" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
-                                     AutomationProperties.Name="Клавиша звука награды"
-                                     PreviewKeyDown="OnRewardHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
-                            <Button Style="{StaticResource ResetHotkeyButton}" AutomationProperties.Name="Убрать клавишу звука награды"
-                                    Click="OnResetRewardHotkey"/>
-                        </Grid>
-                    </Grid>
-                    <TextBlock Text="Проигрывает звук выбранной награды вручную, даже когда звуки наград выключены. Повторное нажатие запускает звук сначала."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="RewardHotkeyHint" Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed"/>
+                                </Button>
+                                <StackPanel x:Name="PingsPanel" Visibility="Collapsed" Margin="16,0,16,16">
+                                    <Border Height="1" Background="#2E333E" Margin="0,0,0,12"/>
+                                    <CheckBox x:Name="PingHighlightCheck" Style="{StaticResource SwitchCheck}" AutomationProperties.Name="Выделять пинги цветом в чате"
+                                              Content="Выделять пинги цветом в чате поверх игры"
+                                              Checked="OnPingHighlightChanged" Unchecked="OnPingHighlightChanged"/>
+                                    <StackPanel x:Name="PingColorRow" Orientation="Horizontal" Margin="0,10,0,0">
+                                        <Border x:Name="PingColorPreview" Width="26" Height="26" CornerRadius="6" BorderBrush="#3A3F4B" BorderThickness="1"
+                                                VerticalAlignment="Center" AutomationProperties.Name="Цвет пингов"/>
+                                        <WrapPanel x:Name="PingSwatches" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                        <Button Style="{StaticResource FlatButton}" Content="Свой цвет…" Margin="6,0,0,0" VerticalAlignment="Center" Click="OnPingColorCustom"/>
+                                    </StackPanel>
 
-                    <Separator Margin="0,12,0,10" Background="#3A3F4B"/>
+                                    <TextBlock Text="Слова для пингов, кроме @ника" Style="{StaticResource Label}" Margin="0,14,0,3"/>
+                                    <DockPanel>
+                                        <Button x:Name="PingWordAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Добавить"
+                                                Margin="8,0,0,0" Click="OnAddPingWord"/>
+                                        <TextBox x:Name="PingWordInput" AutomationProperties.Name="Слово для пингов" PreviewKeyDown="OnPingWordKeyDown"
+                                                 ToolTip="Слово ищется целиком без учёта регистра; * заменяет любые буквы: стрим* найдёт стримы. Слова с пробелами это фраза. Можно вставить сразу несколько через запятую."/>
+                                    </DockPanel>
+                                    <ItemsControl x:Name="PingWordsList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>
+                                    <TextBlock x:Name="PingWordsStatus" Foreground="{StaticResource WarnBrush}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
 
-                    <TextBlock Text="Звуки наград" Style="{StaticResource Heading}"/>
-                    <CheckBox x:Name="RewardSoundsMutedCheck" Content="Выключить звуки всех наград" Margin="0,10,0,0"
-                              AutomationProperties.Name="Выключить звуки всех наград" Click="OnRewardSoundsMutedClick"/>
-                    <TextBlock Text="Пока звуки выключены, в углу экрана виден значок. Клавиша — на вкладке «Общие»."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                    <CheckBox x:Name="MuteRewardsOffCheck" Margin="0,10,0,0" AutomationProperties.Name="Выключать на это время награды со звуком"
-                              Checked="OnMuteRewardsOffChanged" Unchecked="OnMuteRewardsOffChanged">
-                        <TextBlock TextWrapping="Wrap" Text="Выключать на это время награды со звуком"/>
-                    </CheckBox>
-                    <TextBlock Text="Награды из списка «Звук заказа награды» выше выключаются на Twitch, пока звуки выключены, и включаются обратно вместе со звуками: зрители их не видят и не тратят баллы. Twitch разрешает это только для наград, созданных программой."
-                               Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="MuteRewardsStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                    <CheckBox x:Name="MuteBadgeHiddenCheck" Content="Выключить отображение иконки" Margin="0,10,0,0"
-                              AutomationProperties.Name="Выключить отображение иконки" Click="OnMuteBadgeHiddenClick"/>
-                    <TextBlock x:Name="MuteBadgeHiddenWarning" Text="Не забывайте включать алёрты назад: с этой настройкой иконки напоминания не будет!"
-                               Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="48"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Размер значка" VerticalAlignment="Center"/>
-                        <Slider x:Name="MuteBadgeScaleSlider" Grid.Column="1" Minimum="60" Maximum="400" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Размер значка" ValueChanged="OnMuteBadgeScaleChanged"/>
-                        <TextBlock x:Name="MuteBadgeScaleText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button x:Name="MuteBadgePositionButton" Style="{StaticResource PrimaryButton}" Content="Выбрать положение"
-                                Click="OnMuteBadgePosition"/>
-                        <Button x:Name="MuteBadgeResetButton" Style="{StaticResource FlatButton}" Content="Сбросить положение" Margin="8,0,0,0"
-                                Click="OnMuteBadgeResetPosition"/>
+                                    <DockPanel Margin="0,14,0,0">
+                                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Сбросить" Padding="8,0"
+                                                ToolTip="Вернуть список ботов, который был в начале" Click="OnResetPingIgnored"/>
+                                        <TextBlock Text="Не считать (боты)" Style="{StaticResource Label}" Margin="0" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                    <DockPanel Margin="0,4,0,0">
+                                        <Button x:Name="PingIgnoredAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Добавить"
+                                                Margin="8,0,0,0" Click="OnAddPingIgnored"/>
+                                        <TextBox x:Name="PingIgnoredInput" AutomationProperties.Name="Аккаунт, который не считать" PreviewKeyDown="OnPingIgnoredKeyDown"
+                                                 ToolTip="Логин аккаунта (@ и заглавные буквы не важны). Можно вставить сразу несколько через запятую."/>
+                                    </DockPanel>
+                                    <ItemsControl x:Name="PingIgnoredList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
-                </StackPanel>
+                    <StackPanel x:Name="PageRewards" Style="{StaticResource Page}">
+                        <TextBlock Text="Награды" Style="{StaticResource PageTitle}"/>
+                        <TextBlock Text="Награды за баллы канала, их звуки и клавиши." Style="{StaticResource PageSub}"/>
 
-                <StackPanel x:Name="SectionPings" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Пинги в чате" Style="{StaticResource Heading}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Управление наградами" Style="{StaticResource CardTitle}"/>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button x:Name="RewardCreateButton" Style="{StaticResource PrimaryButton}" Content="Создать награду"
+                                            Margin="0,0,8,8" Click="OnCreateRewardClick"/>
+                                    <Button x:Name="RewardsSyncButton" Style="{StaticResource SoftButton}" Content="Синхронизировать"
+                                            Margin="0,0,8,8" ToolTip="Создать копии наград канала, которыми программа сможет управлять" Click="OnSyncRewards"/>
+                                    <Button x:Name="RewardIconsButton" Style="{StaticResource SoftButton}" Content="Сохранить иконки"
+                                            Margin="0,0,8,8" ToolTip="Сохранить иконки наград за баллы в папку" Click="OnSaveRewardIcons"/>
+                                </WrapPanel>
+                                <CheckBox x:Name="OnlyOwnRewardsCheck" Style="{StaticResource SwitchCheck}" Content="Показывать только награды, созданные программой"
+                                          Margin="0,4,0,0" Checked="OnOnlyOwnRewardsChanged" Unchecked="OnOnlyOwnRewardsChanged"/>
+                                <TextBlock x:Name="RewardsSyncStatus" Style="{StaticResource Label}" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="RewardsShowStatus" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                                <Border x:Name="RewardsShowPanel" Background="#1B1D23" BorderBrush="#2E333E" BorderThickness="1" CornerRadius="8" Padding="12,6,6,8"
+                                        Margin="0,8,0,0" Visibility="Collapsed">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="76"/>
+                                                <ColumnDefinition Width="84"/>
+                                                <ColumnDefinition Width="30"/>
+                                                <ColumnDefinition Width="34"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Награда" Style="{StaticResource ColHead}"/>
+                                            <TextBlock Grid.Column="1" Text="На канале" Style="{StaticResource ColHead}" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="Уведомлять" Style="{StaticResource ColHead}" HorizontalAlignment="Center"/>
+                                        </Grid>
+                                        <ItemsControl x:Name="RewardsShowList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,3,0,0">
+                                                        <Grid MinHeight="26" Visibility="{Binding NotConfirming, Converter={StaticResource BoolVis}}">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="76"/>
+                                                                <ColumnDefinition Width="84"/>
+                                                                <ColumnDefinition Width="30"/>
+                                                                <ColumnDefinition Width="34"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding DisplayText}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,8,0">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Enabled}" Value="False">
+                                                                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <Button Grid.Column="1" Style="{StaticResource SwitchButton}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                    Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}" IsEnabled="{Binding NotBusy}"
+                                                                    AutomationProperties.Name="{Binding SwitchName}" Click="OnToggleRewardEnabledClick"
+                                                                    ToolTip="Включить или выключить награду на канале: выключенную зрители не видят и не могут заказать"/>
+                                                            <CheckBox Grid.Column="2" IsChecked="{Binding Shown, Mode=TwoWay}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                      Margin="10,0,0,0" AutomationProperties.Name="{Binding Name}" Click="OnRewardShownClick"
+                                                                      ToolTip="Уведомлять и записывать в список «Награды»"/>
+                                                            <Button Grid.Column="3" Style="{StaticResource FlatButton}" Padding="5" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                    Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}" IsEnabled="{Binding NotBusy}"
+                                                                    ToolTip="Изменить награду: название, цена, описание, ограничения" AutomationProperties.Name="{Binding EditName}" Click="OnEditRewardClick">
+                                                                <Path Data="M10.5,2.8 L13.2,5.5 L5.6,13.1 L2.6,13.4 L2.9,10.4 Z M9.2,4.1 L11.9,6.8"
+                                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
+                                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                                      Width="16" Height="16" Stretch="None"/>
+                                                            </Button>
+                                                            <Button Grid.Column="4" Style="{StaticResource FlatButton}" Foreground="{StaticResource DangerBrush}" Padding="5"
+                                                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                    Visibility="{Binding CanManage, Converter={StaticResource BoolVis}}"
+                                                                    ToolTip="Удалить награду с канала" AutomationProperties.Name="{Binding DeleteName}" Click="OnDeleteManagedClick">
+                                                                <Path Data="M3.5,5 H12.5 M6.5,5 V3.5 H9.5 V5 M4.8,5 L5.4,13 H10.6 L11.2,5 M7,7.5 V11 M9,7.5 V11"
+                                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"
+                                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                                                      Width="16" Height="16" Stretch="None"/>
+                                                            </Button>
+                                                        </Grid>
+                                                        <StackPanel Margin="0,4,0,4" Visibility="{Binding Confirming, Converter={StaticResource BoolVis}}">
+                                                            <TextBlock Text="{Binding ConfirmText}" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                                <Button Style="{StaticResource PrimaryButton}" Content="Да, удалить" Padding="14,5"
+                                                                        Background="{StaticResource DangerBrush}" Click="OnConfirmDeleteManaged"/>
+                                                                <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0"
+                                                                        Click="OnCancelDeleteManaged"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Style="{StaticResource Note}" Margin="0,8,0,0"
+                                           Text="Без «Уведомлять» у награды нет уведомления и записи в списке «Награды», а звук всё равно играет."/>
+                                <TextBlock x:Name="RewardsTwitchNote" Style="{StaticResource Note}" Visibility="Collapsed"
+                                           Text="Награды, созданные Twitch, нельзя принять или отклонить с помощью программы в меню «Награды»."/>
+                                <Button x:Name="DeleteAllButton" Style="{StaticResource SoftButton}" Content="Удалить все копии"
+                                        HorizontalAlignment="Left" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0"
+                                        Visibility="Collapsed" Click="OnDeleteAllCopies"/>
+                                <StackPanel x:Name="DeleteAllPanel" Visibility="Collapsed" Margin="0,6,0,0">
+                                    <TextBlock x:Name="DeleteAllText" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource PrimaryButton}" Content="Да, удалить все" Padding="14,5"
+                                                Background="{StaticResource DangerBrush}" Click="OnConfirmDeleteAll"/>
+                                        <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0" Click="OnCancelDeleteAll"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
 
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовый пинг" AutomationProperties.Name="Добавить тестовый пинг" Click="OnAddTestPing"/>
-                        <Ellipse x:Name="PingsStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="PingsStatusText" Text="Пинги: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    </DockPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Звук заказа награды" Style="{StaticResource CardTitle}"/>
+                                <TextBlock x:Name="RewardSoundListStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0"
+                                           TextWrapping="Wrap" Visibility="Collapsed"/>
+                                <ItemsControl x:Name="RewardSoundList" Margin="0,6,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <RadioButton GroupName="rewardsound" Style="{StaticResource TabButton}"
+                                                         IsChecked="{Binding Picked, Mode=TwoWay}" Checked="OnRewardSoundPicked"
+                                                         AutomationProperties.Name="{Binding Name}">
+                                                <DockPanel LastChildFill="True">
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding SoundText}" Margin="14,0,0,0" MaxWidth="220"
+                                                               FontWeight="Normal" Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding HotkeyText}" Margin="14,0,0,0"
+                                                               FontWeight="Normal" Foreground="{StaticResource AccentBrush}"/>
+                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                                </DockPanel>
+                                            </RadioButton>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button x:Name="RewardSoundAddButton" Style="{StaticResource FlatButton}" Content="+ Добавить награду"
+                                        HorizontalAlignment="Left" Foreground="{StaticResource AccentBrush}" Margin="0,6,0,0"
+                                        Click="OnRewardSoundAddToggle"/>
+                                <StackPanel x:Name="RewardSoundAddPanel" Visibility="Collapsed" Margin="0,2,0,0">
+                                    <ItemsControl x:Name="RewardSoundAvailableList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <RadioButton GroupName="rewardsoundadd" Style="{StaticResource TabButton}" IsChecked="False"
+                                                             Checked="OnRewardSoundAddPick" AutomationProperties.Name="{Binding Name}">
+                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                                </RadioButton>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button x:Name="RewardAlertChooseButton" Style="{StaticResource PrimaryButton}" Content="Выбрать файл"
+                                            Margin="0,0,8,0" Click="OnRewardAlertChoose"/>
+                                    <Button x:Name="RewardAlertTestButton" Style="{StaticResource FlatButton}" Content="Проверить" Margin="0,0,4,0"
+                                            Click="OnRewardAlertTest"/>
+                                    <Button x:Name="RewardAlertClearButton" Style="{StaticResource FlatButton}" Content="Убрать"
+                                            Foreground="{StaticResource DangerBrush}" Click="OnRewardAlertClear"/>
+                                </WrapPanel>
+                                <TextBlock x:Name="RewardAlertStatus" Foreground="{StaticResource WarnBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="52"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Громкость" VerticalAlignment="Center"/>
+                                    <Slider x:Name="RewardAlertVolumeSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Громкость звука заказа" ValueChanged="OnRewardAlertVolumeChanged"/>
+                                    <TextBlock x:Name="RewardAlertVolumeText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Клавиша звука" VerticalAlignment="Center"/>
+                                    <Grid Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="8,0,0,0">
+                                        <TextBox x:Name="RewardAlertHotkeyBox" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша звука награды"
+                                                 PreviewKeyDown="OnRewardHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Style="{StaticResource ResetHotkeyButton}" AutomationProperties.Name="Убрать клавишу звука награды"
+                                                Click="OnResetRewardHotkey"/>
+                                    </Grid>
+                                </Grid>
+                                <TextBlock Style="{StaticResource Note}"
+                                           Text="Проигрывает звук выбранной награды вручную, даже когда звуки наград выключены. Повторное нажатие запускает звук сначала."/>
+                                <TextBlock x:Name="RewardHotkeyHint" Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
 
-                    <CheckBox x:Name="PingsCheck" Margin="0,10,0,0" Click="OnOptionsChanged"
-                              AutomationProperties.Name="Уведомлять о пингах">
-                        <TextBlock TextWrapping="Wrap" Text="Уведомлять о пингах"/>
-                    </CheckBox>
-
-                    <CheckBox x:Name="PingHighlightCheck" Margin="0,10,0,0" AutomationProperties.Name="Выделять пинги цветом в чате"
-                              Checked="OnPingHighlightChanged" Unchecked="OnPingHighlightChanged">
-                        <TextBlock TextWrapping="Wrap" Text="Выделять пинги цветом в чате поверх игры"/>
-                    </CheckBox>
-                    <StackPanel x:Name="PingColorRow" Orientation="Horizontal" Margin="0,8,0,0">
-                        <Border x:Name="PingColorPreview" Width="26" Height="26" CornerRadius="6" BorderBrush="#3A3F4B" BorderThickness="1"
-                                VerticalAlignment="Center" AutomationProperties.Name="Цвет пингов"/>
-                        <WrapPanel x:Name="PingSwatches" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource FlatButton}" Content="Свой цвет…" Margin="6,0,0,0" VerticalAlignment="Center" Click="OnPingColorCustom"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Звуки наград" Style="{StaticResource CardTitle}"/>
+                                <DockPanel Margin="0,12,0,0" LastChildFill="True">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <TextBlock Text="Клавиша" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="12,0,8,0"/>
+                                        <Grid Width="150">
+                                            <TextBox x:Name="HotkeyRewardSoundsBox" Tag="RewardSoundsMute" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                     AutomationProperties.Name="Клавиша: звуки наград выкл / вкл" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                            <Button Tag="RewardSoundsMute" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                        </Grid>
+                                    </StackPanel>
+                                    <CheckBox x:Name="RewardSoundsMutedCheck" Style="{StaticResource SwitchCheck}" Content="Выключить звуки всех наград"
+                                              Margin="0,4,0,0" AutomationProperties.Name="Выключить звуки всех наград" Click="OnRewardSoundsMutedClick"/>
+                                </DockPanel>
+                                <TextBlock Style="{StaticResource Note}" Text="Пока звуки выключены, в углу экрана виден значок."/>
+                                <CheckBox x:Name="MuteRewardsOffCheck" Style="{StaticResource SwitchCheck}" Margin="0,12,0,0"
+                                          AutomationProperties.Name="Выключать на это время награды со звуком"
+                                          Checked="OnMuteRewardsOffChanged" Unchecked="OnMuteRewardsOffChanged">
+                                    <TextBlock TextWrapping="Wrap" Text="Выключать на это время награды со звуком"/>
+                                </CheckBox>
+                                <TextBlock Style="{StaticResource Note}"
+                                           Text="Награды из «Звук заказа награды» выключаются на Twitch, пока звуки выключены, и включаются обратно вместе со звуками: зрители их не видят и не тратят баллы. Twitch разрешает это только для наград, созданных программой."/>
+                                <TextBlock x:Name="MuteRewardsStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                                <CheckBox x:Name="MuteBadgeHiddenCheck" Style="{StaticResource SwitchCheck}" Content="Не показывать значок" Margin="0,12,0,0"
+                                          AutomationProperties.Name="Выключить отображение иконки" Click="OnMuteBadgeHiddenClick"/>
+                                <TextBlock x:Name="MuteBadgeHiddenWarning" Text="Не забывайте включать алёрты назад: с этой настройкой иконки напоминания не будет!"
+                                           Foreground="{StaticResource WarnBrush}" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="52"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Размер значка" VerticalAlignment="Center"/>
+                                    <Slider x:Name="MuteBadgeScaleSlider" Grid.Column="1" Minimum="60" Maximum="400" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Размер значка" ValueChanged="OnMuteBadgeScaleChanged"/>
+                                    <TextBlock x:Name="MuteBadgeScaleText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button x:Name="MuteBadgePositionButton" Style="{StaticResource PrimaryButton}" Content="{x:Static ui:SettingsWindow.PositionText}"
+                                            Margin="0,0,8,0" Click="OnMuteBadgePosition"/>
+                                    <Button x:Name="MuteBadgeResetButton" Style="{StaticResource FlatButton}" Content="Сбросить положение"
+                                            Click="OnMuteBadgeResetPosition"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
 
-                    <TextBlock Text="Слова для пингов (кроме @ника)" Style="{StaticResource Label}"/>
-                    <DockPanel>
-                        <Button x:Name="PingWordAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Добавить"
-                                Margin="8,0,0,0" Click="OnAddPingWord"/>
-                        <TextBox x:Name="PingWordInput" AutomationProperties.Name="Слово для пингов" PreviewKeyDown="OnPingWordKeyDown"
-                                 ToolTip="Слово ищется целиком без учёта регистра; * заменяет любые буквы: стрим* найдёт стримы. Слова с пробелами это фраза. Можно вставить сразу несколько через запятую."/>
-                    </DockPanel>
-                    <ItemsControl x:Name="PingWordsList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>
-                    <TextBlock x:Name="PingWordsStatus" Foreground="{StaticResource WarnBrush}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-                    <DockPanel Margin="0,14,0,0">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Сбросить" Padding="8,0"
-                                ToolTip="Вернуть список ботов, который был в начале" Click="OnResetPingIgnored"/>
-                        <TextBlock Text="Не считать (боты)" Style="{StaticResource Label}" Margin="0" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <DockPanel Margin="0,4,0,0">
-                        <Button x:Name="PingIgnoredAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Добавить"
-                                Margin="8,0,0,0" Click="OnAddPingIgnored"/>
-                        <TextBox x:Name="PingIgnoredInput" AutomationProperties.Name="Аккаунт, который не считать" PreviewKeyDown="OnPingIgnoredKeyDown"
-                                 ToolTip="Логин аккаунта (@ и заглавные буквы не важны). Можно вставить сразу несколько через запятую."/>
-                    </DockPanel>
-                    <ItemsControl x:Name="PingIgnoredList" ItemTemplate="{StaticResource RemovableChip}" ItemsPanel="{StaticResource WrapItems}"/>
-                </StackPanel>
+                    <StackPanel x:Name="PageChat" Style="{StaticResource Page}">
+                        <TextBlock Text="Чат" Style="{StaticResource PageTitle}"/>
+                        <DockPanel Margin="0,6,0,16" LastChildFill="True">
+                            <Ellipse x:Name="ChatStatusDot" DockPanel.Dock="Left" Style="{StaticResource StatusDot}"/>
+                            <TextBlock x:Name="ChatStatusText" Text="Не подключено" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
+                        </DockPanel>
 
-                <StackPanel x:Name="SectionMoments" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Рейды и стрики" Style="{StaticResource Heading}"/>
+                        <Border x:Name="ChannelBlock" Style="{StaticResource Card}" Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock Text="Канал чата" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Note}" Margin="0,2,0,0" Text="Чей чат показывать поверх игры. На чужом канале уведомления, подписки и награды не приходят."/>
+                                <Border Background="#1B1D23" BorderBrush="#333845" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,8,0,0">
+                                    <DockPanel LastChildFill="True">
+                                        <Button x:Name="ChannelPickerButton" DockPanel.Dock="Right" Style="{StaticResource SoftButton}" VerticalAlignment="Center"
+                                                AutomationProperties.Name="Сменить канал" Click="OnToggleChannelPicker">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Сменить канал" VerticalAlignment="Center"/>
+                                                <Path Data="M4.5,6.5 L8,10 L11.5,6.5" Width="16" Height="16" Stretch="None" Margin="6,0,-4,0"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform x:Name="ChannelPickerChevron" Angle="0"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                            </StackPanel>
+                                        </Button>
+                                        <Border x:Name="CurrentChannelFace" DockPanel.Dock="Left" Width="30" Height="30" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock x:Name="CurrentChannelName" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <Border Background="#2A2F3A" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="CurrentChannelKind" FontSize="11" Foreground="#A9AFBC"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock x:Name="CurrentChannelNote" Style="{StaticResource Note}" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <TextBlock x:Name="ViewerStatusText" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12" Visibility="Collapsed"/>
 
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Ellipse x:Name="MomentsStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="MomentsStatusText" Text="Рейды и стрики: не подключено" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                    </DockPanel>
+                                <Border x:Name="ChannelPicker" Visibility="Collapsed" Background="#1B1D23" BorderBrush="#333845" BorderThickness="1"
+                                        CornerRadius="8" Padding="12,10,12,12" Margin="0,8,0,0">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <Button x:Name="ChannelRefreshButton" DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Обновить список"
+                                                    Margin="8,0,0,0" Click="OnRefreshChannels"/>
+                                            <Grid>
+                                                <TextBox x:Name="ChannelSearchBox" AutomationProperties.Name="Найти канал" TextChanged="OnChannelSearchChanged"/>
+                                                <TextBlock x:Name="ChannelSearchHint" Text="Найти канал" Foreground="{StaticResource MutedBrush}" Margin="9,0,0,0"
+                                                           VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                            </Grid>
+                                        </DockPanel>
+                                        <TextBlock Text="Свой канал" Style="{StaticResource Label}"/>
+                                        <WrapPanel x:Name="ChannelChoices"/>
+                                        <TextBlock x:Name="ModeratedLabel" Text="Где ты модератор" Style="{StaticResource Label}"/>
+                                        <WrapPanel x:Name="ModeratedChoices"/>
+                                        <TextBlock x:Name="ChannelStatusText" Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12" Visibility="Collapsed"/>
+                                        <TextBlock Text="Как зритель" Style="{StaticResource Label}"/>
+                                        <WrapPanel x:Name="ViewerChoices"/>
+                                        <DockPanel Margin="0,8,0,0">
+                                            <Button x:Name="ViewerAddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Подключить"
+                                                    Margin="8,0,0,0" Click="OnAddViewerChannel"/>
+                                            <TextBox x:Name="ViewerChannelInput" AutomationProperties.Name="Ник канала" PreviewKeyDown="OnViewerChannelKeyDown"
+                                                     ToolTip="Ник канала или ссылка twitch.tv/…: подключишься к его чату как зритель"/>
+                                        </DockPanel>
+                                        <TextBlock Style="{StaticResource Note}" Margin="0,4,0,0"
+                                                   Text="Ник канала или ссылка twitch.tv/…: подключишься к его чату как зритель."/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
 
-                    <DockPanel Margin="0,10,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовый рейд" AutomationProperties.Name="Добавить тестовый рейд" Click="OnAddTestRaid"/>
-                        <CheckBox x:Name="RaidsCheck" Click="OnOptionsChanged" AutomationProperties.Name="Уведомлять о рейдах">
-                            <TextBlock TextWrapping="Wrap" Text="Уведомлять о рейдах"/>
-                        </CheckBox>
-                    </DockPanel>
-                    <DockPanel Margin="0,10,0,0" LastChildFill="True">
-                        <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Тест" MinWidth="0" Padding="10,1"
-                                VerticalAlignment="Center" Margin="8,-3,0,-3" ToolTip="Добавить тестовый стрик" AutomationProperties.Name="Добавить тестовый стрик" Click="OnAddTestStreak"/>
-                        <CheckBox x:Name="StreaksCheck" Click="OnOptionsChanged" AutomationProperties.Name="Уведомлять о стриках">
-                            <TextBlock TextWrapping="Wrap" Text="Уведомлять о стриках"/>
-                        </CheckBox>
-                    </DockPanel>
-                    <TextBlock Text="Стрик: зритель отметил в чате, сколько стримов подряд он смотрит." Foreground="{StaticResource MutedBrush}"
-                               Margin="0,10,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Вид" Style="{StaticResource CardTitle}"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Фон чата" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatOpacitySlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Непрозрачность фона чата" ValueChanged="OnChatSliderChanged"/>
+                                    <TextBlock x:Name="ChatOpacityText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Подсветка сообщений" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatCellSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Непрозрачность плашки сообщений" ValueChanged="OnChatSliderChanged"/>
+                                    <TextBlock x:Name="ChatCellText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Обводка сообщений" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatOutlineSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Непрозрачность чёрной обводки сообщений" ValueChanged="OnChatSliderChanged"/>
+                                    <TextBlock x:Name="ChatOutlineText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Размер текста" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatFontSlider" Grid.Column="1" Minimum="10" Maximum="28" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Размер текста чата" ValueChanged="OnChatSliderChanged"/>
+                                    <TextBlock x:Name="ChatFontText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Появление сообщений" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatAppearSlider" Grid.Column="1" Minimum="0" Maximum="1000" TickFrequency="50"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Плавность появления сообщений" ValueChanged="OnChatAppearChanged"
+                                            ToolTip="Сколько длится плавное появление нового сообщения. Влево до упора: сразу, без анимации."/>
+                                    <TextBlock x:Name="ChatAppearText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <WrapPanel Margin="0,14,0,0">
+                                    <Button x:Name="ChatPositionButton" Style="{StaticResource PrimaryButton}" Content="{x:Static ui:SettingsWindow.PositionText}"
+                                            Margin="0,0,8,0" Click="OnChatPosition"/>
+                                    <Button Style="{StaticResource FlatButton}" Content="Сбросить положение" Click="OnChatResetPosition"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
 
-                <StackPanel x:Name="SectionChat" Style="{StaticResource SectionPanel}">
-                    <TextBlock Text="Чат Twitch" Style="{StaticResource Heading}"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Клавиши" Style="{StaticResource CardTitle}"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Показать / скрыть" VerticalAlignment="Center"/>
+                                    <Grid Grid.Row="0" Grid.Column="1" Width="200" HorizontalAlignment="Left">
+                                        <TextBox x:Name="HotkeyChatToggleBox" Tag="ChatToggle" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша: чат показать / скрыть" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Tag="ChatToggle" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1" Text="Управление мышью" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                                    <Grid Grid.Row="1" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                                        <TextBox x:Name="HotkeyChatBox" Tag="ChatInteract" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша: чат, управление мышью" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Tag="ChatInteract" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                    </Grid>
+                                    <TextBlock Grid.Row="2" Text="Написать сообщение" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                                    <Grid Grid.Row="2" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                                        <TextBox x:Name="HotkeyChatWriteBox" Tag="ChatWrite" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша: чат, написать сообщение" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Tag="ChatWrite" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
-                    <DockPanel Margin="0,8,0,0" LastChildFill="True">
-                        <Ellipse x:Name="ChatStatusDot" DockPanel.Dock="Left" Width="9" Height="9" Fill="{StaticResource MutedBrush}"
-                                 Margin="0,4,8,0" VerticalAlignment="Top"/>
-                        <TextBlock x:Name="ChatStatusText" Text="Не подключено" TextWrapping="Wrap"/>
-                    </DockPanel>
-
-                    <Grid Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Фон Чата" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatOpacitySlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Непрозрачность фона чата" ValueChanged="OnChatSliderChanged"/>
-                        <TextBlock x:Name="ChatOpacityText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Подсветка Сообщений" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatCellSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Непрозрачность плашки сообщений" ValueChanged="OnChatSliderChanged"/>
-                        <TextBlock x:Name="ChatCellText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Обводка Сообщений" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatOutlineSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Непрозрачность чёрной обводки сообщений" ValueChanged="OnChatSliderChanged"/>
-                        <TextBlock x:Name="ChatOutlineText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,24,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Размер текста" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatFontSlider" Grid.Column="1" Minimum="10" Maximum="28" TickFrequency="1"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Размер текста чата" ValueChanged="OnChatSliderChanged"/>
-                        <TextBlock x:Name="ChatFontText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,24,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Появление сообщений" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatAppearSlider" Grid.Column="1" Minimum="0" Maximum="1000" TickFrequency="50"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Плавность появления сообщений" ValueChanged="OnChatAppearChanged"
-                                ToolTip="Сколько длится плавное появление нового сообщения. Влево до упора: сразу, без анимации."/>
-                        <TextBlock x:Name="ChatAppearText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <Grid Margin="0,24,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="190"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="60"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Автоматический Мут на -" VerticalAlignment="Center"/>
-                        <Slider x:Name="ChatMuteSlider" Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1"
-                                IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
-                                AutomationProperties.Name="Длительность мута" ValueChanged="OnChatMuteChanged"/>
-                        <TextBlock x:Name="ChatMuteText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                   Foreground="{StaticResource MutedBrush}"/>
-                    </Grid>
-
-                    <CheckBox x:Name="ChatViewersCheck" Margin="0,16,0,0" AutomationProperties.Name="Показывать число зрителей под чатом"
-                              Click="OnChatViewersClick">
-                        <TextBlock TextWrapping="Wrap" Text="Показывать число зрителей под чатом"/>
-                    </CheckBox>
-
-                    <CheckBox x:Name="ChatPreviewsCheck" Margin="0,10,0,0" AutomationProperties.Name="Показывать превью клипов Twitch и видео YouTube"
-                              Click="OnChatPreviewsClick">
-                        <TextBlock TextWrapping="Wrap" Text="Показывать превью клипов Twitch и видео YouTube"/>
-                    </CheckBox>
-
-                    <TextBlock x:Name="ChatModerationText" Foreground="{StaticResource WarnBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
-                               Visibility="Collapsed" Text="Для бана и мута переподключи Twitch (вкладка «Twitch»): нужно новое право."/>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <Button x:Name="ChatPositionButton" Style="{StaticResource PrimaryButton}" Content="Выбрать положение"
-                                Click="OnChatPosition"/>
-                        <Button Style="{StaticResource FlatButton}" Content="Сбросить положение" Margin="8,0,0,0"
-                                Click="OnChatResetPosition"/>
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Дополнительно" Style="{StaticResource CardTitle}"/>
+                                <CheckBox x:Name="ChatViewersCheck" Style="{StaticResource SwitchCheck}" Margin="0,12,0,0"
+                                          AutomationProperties.Name="Показывать число зрителей под чатом" Click="OnChatViewersClick">
+                                    <TextBlock TextWrapping="Wrap" Text="Показывать число зрителей под чатом"/>
+                                </CheckBox>
+                                <CheckBox x:Name="ChatPreviewsCheck" Style="{StaticResource SwitchCheck}" Margin="0,10,0,0"
+                                          AutomationProperties.Name="Показывать превью клипов Twitch и видео YouTube" Click="OnChatPreviewsClick">
+                                    <TextBlock TextWrapping="Wrap" Text="Показывать превью клипов Twitch и видео YouTube"/>
+                                </CheckBox>
+                                <Grid Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="60"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Мут кнопкой в чате на" VerticalAlignment="Center"/>
+                                    <Slider x:Name="ChatMuteSlider" Grid.Column="1" Minimum="1" Maximum="100" TickFrequency="1"
+                                            IsSnapToTickEnabled="True" VerticalAlignment="Center" Margin="8,0"
+                                            AutomationProperties.Name="Длительность мута" ValueChanged="OnChatMuteChanged"/>
+                                    <TextBlock x:Name="ChatMuteText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Foreground="{StaticResource MutedBrush}"/>
+                                </Grid>
+                                <TextBlock x:Name="ChatModerationText" Foreground="{StaticResource WarnBrush}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </StackPanel>
 
-            </Grid>
-        </ScrollViewer>
+                    <StackPanel x:Name="PageGeneral" Style="{StaticResource Page}">
+                        <TextBlock Text="Общие" Style="{StaticResource PageTitle}"/>
+                        <TextBlock Text="Клавиши вкладок, чата и звуков стоят рядом с ними: в «Событиях», «Чате» и «Наградах»."
+                                   Style="{StaticResource PageSub}"/>
 
-        <Border x:Name="CreditsBar" Grid.Row="3" Padding="16,4,8,4" BorderBrush="#3A3F4B" BorderThickness="0,1,0,0">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Клавиши программы" Style="{StaticResource CardTitle}"/>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="170"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Открыть настройки" VerticalAlignment="Center"/>
+                                    <Grid Grid.Row="0" Grid.Column="1" Width="200" HorizontalAlignment="Left">
+                                        <TextBox x:Name="HotkeySettingsBox" Tag="Settings" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша: настройки" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Tag="Settings" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                    </Grid>
+                                    <TextBlock Grid.Row="1" Text="Скрыть уведомления" VerticalAlignment="Center" Margin="0,6,0,0"/>
+                                    <Grid Grid.Row="1" Grid.Column="1" Width="200" HorizontalAlignment="Left" Margin="0,6,0,0">
+                                        <TextBox x:Name="HotkeyHideToastsBox" Tag="HideToasts" IsReadOnly="True" IsReadOnlyCaretVisible="False" Padding="6,5,28,5"
+                                                 AutomationProperties.Name="Клавиша: скрыть уведомления" PreviewKeyDown="OnHotkeyKeyDown" PreviewKeyUp="OnHotkeyKeyUp"/>
+                                        <Button Tag="HideToasts" Style="{StaticResource ResetHotkeyButton}" Click="OnResetHotkey"/>
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Профиль" Style="{StaticResource CardTitle}"/>
+                                <TextBlock Style="{StaticResource Note}" Text="Все настройки в одном файле: перенести на другой компьютер или сохранить копию."/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Style="{StaticResource PrimaryButton}" Content="Сохранить профиль" Margin="0,0,8,0" Click="OnSaveProfile"/>
+                                    <Button Style="{StaticResource PrimaryButton}" Content="Загрузить профиль" Click="OnLoadProfile"/>
+                                </WrapPanel>
+                                <CheckBox x:Name="ProfileListsCheck" Style="{StaticResource SwitchCheck}" Content="Включить списки (донаты, заказы наград и т.д.)"
+                                          Margin="0,12,0,0"/>
+                                <StackPanel x:Name="ProfileConfirmPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                    <TextBlock x:Name="ProfileConfirmText" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                        <Button Style="{StaticResource PrimaryButton}" Content="Загрузить и перезапустить" Padding="14,5"
+                                                Click="OnConfirmLoadProfile"/>
+                                        <Button Style="{StaticResource FlatButton}" Content="Отмена" Margin="6,0,0,0" Click="OnCancelLoadProfile"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock x:Name="ProfileStatus" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Visibility="Collapsed"/>
+                                <Button x:Name="ProfileShowFileButton" Style="{StaticResource FlatButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                        Visibility="Collapsed" Click="OnShowProfileFile"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}">
+                            <DockPanel x:Name="VersionBlock" LastChildFill="True">
+                                <Button DockPanel.Dock="Right" Style="{StaticResource SoftButton}" Content="Выбрать версию…" VerticalAlignment="Center"
+                                        Click="OnChooseVersion"/>
+                                <StackPanel>
+                                    <TextBlock Text="Версия программы" Style="{StaticResource CardTitle}"/>
+                                    <TextBlock Text="{Binding CurrentText}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding AvailableText}" Foreground="{StaticResource AccentBrush}" FontSize="12" Margin="0,2,0,0"
+                                               Visibility="{Binding HasAvailable, Converter={StaticResource BoolVis}}"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                    </StackPanel>
+
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+        <Border x:Name="CreditsBar" Grid.Row="1" Grid.ColumnSpan="2" Padding="16,4,8,4" BorderBrush="#3A3F4B" BorderThickness="0,1,0,0">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Padding="4" Margin="8,0,0,0" VerticalAlignment="Center"
                         ToolTip="Свернуть" AutomationProperties.Name="Свернуть подпись" Click="OnCollapseCredits">
@@ -998,7 +1455,7 @@
                 </TextBlock>
             </DockPanel>
         </Border>
-        <Border x:Name="CreditsHandle" Grid.Row="3" Padding="0,1,8,1" BorderBrush="#3A3F4B" BorderThickness="0,1,0,0" Visibility="Collapsed">
+        <Border x:Name="CreditsHandle" Grid.Row="1" Grid.ColumnSpan="2" Padding="0,1,8,1" BorderBrush="#3A3F4B" BorderThickness="0,1,0,0" Visibility="Collapsed">
             <Button Style="{StaticResource FlatButton}" Padding="6,1" HorizontalAlignment="Right"
                     ToolTip="Показать подпись разработчика" AutomationProperties.Name="Развернуть подпись" Click="OnExpandCredits">
                 <Path Data="M4.5,9.5 L8,6 L11.5,9.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"

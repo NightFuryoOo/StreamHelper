@@ -42,6 +42,8 @@ public sealed class MuteBadgeService : IPositionable
 
     public void Refresh() => Apply(_muted);
 
+    public void ReshowOverGame() => _window?.ReshowOver();
+
     public void ResetPosition()
     {
         var settings = _settings.Current;

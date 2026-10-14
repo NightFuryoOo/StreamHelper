@@ -146,7 +146,7 @@ public sealed class AppSettings
 
     [JsonIgnore] public string ChannelLabel => IsOwnChannel ? TwitchLogin : TwitchChannelName.Length > 0 ? TwitchChannelName : TwitchChannelLogin;
 
-    public string OnlyOwnChannelText(string label) => $"{label}: только на своём канале. Сейчас выбран канал {ChannelLabel} (вкладка «Twitch»).";
+    public string OnlyOwnChannelText(string label) => $"{label}: только на своём канале. Сейчас выбран канал {ChannelLabel} (раздел «Чат»).";
 
     [JsonIgnore]
     public string ConnectedText => IsOwnChannel ? $"Подключено · {TwitchLogin}" : $"Подключено · {TwitchLogin} · канал {ChannelLabel}" + (IsViewerChannel ? " (зритель)" : "");
@@ -317,7 +317,7 @@ public sealed class AppSettings
 
     public bool ListsReward(string rewardId) => AllowsReward(rewardId) && !IsRewardHidden(rewardId);
     public int SelectedTab { get; set; }
-    public int SettingsSection { get; set; }
+    public string SettingsPage { get; set; } = "";
 
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }

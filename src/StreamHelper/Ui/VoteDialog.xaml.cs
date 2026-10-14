@@ -142,10 +142,10 @@ public partial class VoteDialog : Window
     {
         var settings = _settings.Current;
         var poll = _kind == VoteKind.Poll;
-        if (!settings.HasTwitchTokens) return "Сначала подключи Twitch в настройках, вкладка «Twitch».";
+        if (!settings.HasTwitchTokens) return "Сначала подключи Twitch в настройках, раздел «Подключения».";
         if (poll ? !settings.HasPollScope : !settings.HasPredictionScope)
         {
-            return $"Переподключи Twitch в настройках, вкладка «Twitch»: нужно право на {(poll ? "опросы" : "предикты")}.";
+            return $"Переподключи Twitch в настройках, раздел «Подключения»: нужно право на {(poll ? "опросы" : "предикты")}.";
         }
         return null;
     }

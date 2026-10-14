@@ -123,7 +123,7 @@ public sealed partial class TwitchClient
 
     private static void RequireVoteScope(bool granted, string what)
     {
-        if (!granted) throw new AuthRequiredException($"Переподключи Twitch в настройках, вкладка «Twitch»: нужно право на {what}.");
+        if (!granted) throw new AuthRequiredException($"Переподключи Twitch в настройках, раздел «Подключения»: нужно право на {what}.");
     }
 
     private async Task<ChannelVote?> GetLatestVoteAsync(string baseUrl, Func<string, IReadOnlyList<ChannelVote>> parse, CancellationToken ct)

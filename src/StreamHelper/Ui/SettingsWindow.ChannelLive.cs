@@ -134,6 +134,7 @@ public partial class SettingsWindow
         var ids = (_moderated ?? Array.Empty<ModeratedChannel>()).Select(c => c.Id)
             .Concat(settings.ViewerChannels.Select(c => c.Id))
             .Append(settings.IsOwnChannel ? "" : settings.TwitchChannelId)
+            .Append(settings.TwitchUserId)
             .Where(id => id.Length > 0)
             .Distinct()
             .ToList();

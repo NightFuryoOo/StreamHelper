@@ -38,6 +38,18 @@ public static class DonationServices
     public static Uri LogoUri(DonationService service) =>
         new($"pack://application:,,,/Assets/{Title(service).ToLowerInvariant()}.png");
 
+    public static bool IsConnected(AppSettings settings, DonationService service) => service switch
+    {
+        DonationService.DonatePay => settings.HasDonatePayKey,
+        DonationService.DonateX => settings.HasDonateXToken,
+        _ => settings.HasTokens,
+    };
+
+    public static string ConnectText(bool connected) => connected ? "Переподключить" : "Подключить";
+
+    public static string MissingSecretText(DonationService service) =>
+        service == DonationService.DonatePay ? "Сначала вставь ключ API в поле выше." : "Сначала вставь токен в поле выше.";
+
     public static PollingService Poller(Services services, DonationService service) => service switch
     {
         DonationService.DonatePay => services.DonatePayPoller,
@@ -138,6 +150,14 @@ public partial class DonationServiceWindow : Window
     private void ApplyStatus(SyncStatus status)
     {
         ShowStatus(status.Message, DonationServices.BrushKey(status.State));
+        RefreshButtons();
+    }
+
+    private void RefreshButtons()
+    {
+        var connected = DonationServices.IsConnected(_services.Settings.Current, _service);
+        ConnectButton.Content = DonationServices.ConnectText(connected);
+        DisconnectButton.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ShowStatus(string message, string brushKey)
@@ -214,6 +234,7 @@ public partial class DonationServiceWindow : Window
                 _services.Poller.PollSoon();
                 break;
         }
+        RefreshButtons();
     }
 
     private async System.Threading.Tasks.Task ConnectDonationAlertsAsync()
@@ -255,13 +276,18 @@ public partial class DonationServiceWindow : Window
         finally
         {
             ConnectButton.IsEnabled = true;
+            RefreshButtons();
         }
     }
 
     private void SaveDonatePay()
     {
         var key = SecretBox.Password.Trim();
-        if (key.Length == 0) return;
+        if (key.Length == 0)
+        {
+            ShowStatus(DonationServices.MissingSecretText(_service), "WarnBrush");
+            return;
+        }
         var settings = _services.Settings.Current;
         var previous = settings.DonatePayKey;
         if (previous.Length > 0 && previous != key) ForgetDonatePay(settings);
@@ -269,13 +295,18 @@ public partial class DonationServiceWindow : Window
         _services.Settings.Save();
         SecretBox.Clear();
         ShowStatus("Проверяю ключ…", "MutedBrush");
+        RefreshButtons();
         _services.DonatePayPoller.Retry();
     }
 
     private void SaveDonateX()
     {
         var token = SecretBox.Password.Trim();
-        if (token.Length == 0) return;
+        if (token.Length == 0)
+        {
+            ShowStatus(DonationServices.MissingSecretText(_service), "WarnBrush");
+            return;
+        }
         var settings = _services.Settings.Current;
         var previous = settings.DonateXToken;
         if (previous.Length > 0 && previous != token) ForgetDonateX(settings);
@@ -283,6 +314,7 @@ public partial class DonationServiceWindow : Window
         _services.Settings.Save();
         SecretBox.Clear();
         ShowStatus("Проверяю токен…", "MutedBrush");
+        RefreshButtons();
         _services.DonateXPoller.Retry();
     }
 

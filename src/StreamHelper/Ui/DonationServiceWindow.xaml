@@ -65,7 +65,7 @@
         <DockPanel Margin="0,18,0,0" LastChildFill="False">
             <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Закрыть" Click="OnClose"/>
             <Button x:Name="ConnectButton" DockPanel.Dock="Left" Style="{StaticResource PrimaryButton}" Content="Подключить" Click="OnConnect"/>
-            <Button DockPanel.Dock="Left" Style="{StaticResource FlatButton}" Content="Отключить" Margin="8,0,0,0" Click="OnDisconnect"/>
+            <Button x:Name="DisconnectButton" DockPanel.Dock="Left" Style="{StaticResource FlatButton}" Content="Отключить" Margin="8,0,0,0" Click="OnDisconnect"/>
         </DockPanel>
     </StackPanel>
 </Window>

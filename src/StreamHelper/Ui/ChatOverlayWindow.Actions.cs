@@ -35,8 +35,6 @@ public partial class ChatOverlayWindow
         var history = new MenuItem { Header = "История" };
         System.Windows.Automation.AutomationProperties.SetName(history, "История");
         history.Click += (_, _) => HistoryRequested?.Invoke(line.Message);
-        menu.Opened += (_, _) => _menuOpen = true;
-        menu.Closed += (_, _) => _menuOpen = false;
         menu.Items.Add(history);
         if (line.Message.MessageId.Length > 0)
         {
@@ -103,7 +101,7 @@ public partial class ChatOverlayWindow
             menu.Items.Add(remove);
         }
         AddChannelItems(menu);
-        menu.IsOpen = true;
+        OpenMenu(menu);
     }
 
     private MenuItem ShoutoutItem(ContextMenu menu, ChatLine line)

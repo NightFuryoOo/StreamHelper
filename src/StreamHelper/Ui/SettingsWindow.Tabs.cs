@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -12,21 +11,17 @@ public partial class SettingsWindow
 
     private void InitTabChecks(AppSettings settings)
     {
-        _tabChecks = MainTabs.Titles.Select((title, index) =>
+        _tabChecks = new[] { TabEyeDonations, TabEyeFollowers, TabEyeSubscribers, TabEyeRewards, TabEyePings, TabEyeMoments };
+        for (var index = 0; index < _tabChecks.Length; index++)
         {
-            var check = new CheckBox
-            {
-                Content = title,
-                Tag = index,
-                Margin = new Thickness(0, 4, 18, 0),
-                IsChecked = !settings.IsTabHidden(index),
-            };
-            AutomationProperties.SetName(check, $"Показывать вкладку «{title}»");
+            var check = _tabChecks[index];
+            check.Tag = index;
+            check.IsChecked = !settings.IsTabHidden(index);
+            AutomationProperties.SetName(check, $"Показывать вкладку «{MainTabs.Titles[index]}»");
+            ToolTipService.SetShowOnDisabled(check, true);
             check.Checked += OnTabCheckChanged;
             check.Unchecked += OnTabCheckChanged;
-            TabChecks.Children.Add(check);
-            return check;
-        }).ToArray();
+        }
         RefreshTabChecks();
     }
 
@@ -50,7 +45,12 @@ public partial class SettingsWindow
             var shown = !settings.IsTabHidden(index);
             if (check.IsChecked != shown) check.IsChecked = shown;
             check.IsEnabled = !(last && shown);
-            check.ToolTip = last && shown ? "Хотя бы одна вкладка должна остаться" : null;
+            check.ToolTip = TabEyeTip(shown, last && shown);
         }
     }
+
+    public static string TabEyeTip(bool shown, bool lastShown) =>
+        lastShown ? "Хотя бы одна вкладка должна остаться"
+        : shown ? "Вкладка видна в главном окне. Снятая пропадает оттуда, её клавиша не работает, а уведомления идут как раньше."
+        : "Вкладка скрыта из главного окна, её клавиша не работает. Уведомления идут как раньше.";
 }

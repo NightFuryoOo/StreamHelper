@@ -244,7 +244,7 @@ public class ModeratorSyncTests
         try
         {
             Assert.True(await Wait.Until(() => subs.Status.Message.Contains("только на своём канале") && rewards.Status.Message.Contains("только на своём канале")));
-            Assert.Equal("Подписки: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", subs.Status.Message);
+            Assert.Equal("Подписки: только на своём канале. Сейчас выбран канал Big_Streamer (раздел «Чат»).", subs.Status.Message);
             Assert.Equal(0, server.ConnectionCount);
             Assert.Equal(0, api.CallCount);
         }
@@ -323,8 +323,8 @@ public class ModeratorSyncTests
             Assert.Equal("Подключено · streamer · канал Big_Streamer", listener.Status.Message);
             var tab = PingListener.TabStatus(listener.Status, settings.Current);
             Assert.Equal(SyncState.NotConnected, tab.State);
-            Assert.Equal("Пинги: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", tab.Message);
-            Assert.Equal("Рейды и стрики: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", MainViewModel.MomentStatusText(tab));
+            Assert.Equal("Пинги: только на своём канале. Сейчас выбран канал Big_Streamer (раздел «Чат»).", tab.Message);
+            Assert.Equal("Рейды и стрики: только на своём канале. Сейчас выбран канал Big_Streamer (раздел «Чат»).", MainViewModel.MomentStatusText(tab));
         }
         finally
         {
@@ -363,7 +363,7 @@ public class ModeratorSyncTests
         Assert.Empty(source.Requested);
         Assert.Empty(delivered);
         Assert.Equal(SyncState.NotConnected, poller.Status.State);
-        Assert.Equal("Фолловеры: только на своём канале. Сейчас выбран канал Big_Streamer (вкладка «Twitch»).", poller.Status.Message);
+        Assert.Equal("Фолловеры: только на своём канале. Сейчас выбран канал Big_Streamer (раздел «Чат»).", poller.Status.Message);
     }
     [Fact]
     public async Task Polls_and_predictions_are_not_read_on_someone_elses_channel()

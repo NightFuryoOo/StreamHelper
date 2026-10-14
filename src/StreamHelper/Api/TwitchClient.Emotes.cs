@@ -33,7 +33,7 @@ public sealed partial class TwitchClient
 
     public async Task<IReadOnlyList<TwitchEmote>> GetUserEmotesAsync(string? broadcasterId, CancellationToken ct)
     {
-        if (!Settings.HasEmotesScope) throw new AuthRequiredException("Для своих смайлов переподключи Twitch во вкладке «Twitch»: нужно новое право.");
+        if (!Settings.HasEmotesScope) throw new AuthRequiredException("Для своих смайлов переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.");
         var all = new List<TwitchEmote>();
         string? cursor = null;
         for (var page = 0; page < MaxEmotePages; page++)

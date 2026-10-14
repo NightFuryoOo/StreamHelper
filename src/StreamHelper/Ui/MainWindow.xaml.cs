@@ -209,7 +209,13 @@ public partial class MainWindow : Window
 
     private void OnVideoClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is Donation { VideoUrl: { Length: > 0 } url }) BrowserLauncher.Open(url);
+        var url = (sender as FrameworkElement)?.DataContext switch
+        {
+            Donation donation => donation.VideoUrl,
+            Redemption redemption => redemption.VideoUrl,
+            _ => null,
+        };
+        if (!string.IsNullOrEmpty(url)) BrowserLauncher.Open(url);
     }
 
     private void OnDeleteClick(object sender, RoutedEventArgs e)
@@ -301,6 +307,11 @@ public partial class MainWindow : Window
         ping.Selected = false;
         var index = store.Remove(ping);
         if (index >= 0) _services.ViewModel.ShowUndo($"Удалён пинг: {ping.Name}", () => store.Restore(ping, index));
+    }
+
+    private void OnPingHistoryClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is ChatPing ping) _ = _services.Chat.OpenHistoryAsync(ping);
     }
 
     private void OnSelectAllPingsClick(object sender, RoutedEventArgs e) => _services.ViewModel.PingSelection.ToggleAll();

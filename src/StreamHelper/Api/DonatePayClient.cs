@@ -48,7 +48,7 @@ public sealed class DonatePayClient : IDonationWindowSource
 
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
-            throw new AuthRequiredException("DonatePay отклонил ключ API. Проверь ключ в настройках, вкладка «Донаты».");
+            throw new AuthRequiredException("DonatePay отклонил ключ API. Проверь ключ в настройках, раздел «Подключения».");
         }
         if (response.StatusCode == (HttpStatusCode)429)
         {
@@ -73,7 +73,7 @@ public sealed class DonatePayClient : IDonationWindowSource
             var message = ReadString(root, "message");
             if (IsAuthProblem(message))
             {
-                throw new AuthRequiredException("DonatePay отклонил ключ API. Проверь ключ в настройках, вкладка «Донаты».");
+                throw new AuthRequiredException("DonatePay отклонил ключ API. Проверь ключ в настройках, раздел «Подключения».");
             }
             throw new HttpRequestException(message.Length > 0 ? "DonatePay: " + message : "DonatePay вернул ошибку.");
         }

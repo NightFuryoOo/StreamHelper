@@ -273,7 +273,8 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
         return live;
     }
 
-    public async Task<DownloadedImage?> DownloadImageAsync(string url, CancellationToken ct)    {
+    public async Task<DownloadedImage?> DownloadImageAsync(string url, CancellationToken ct)
+    {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
         if (uri.Scheme != Uri.UriSchemeHttps && !(uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)) return null;
 

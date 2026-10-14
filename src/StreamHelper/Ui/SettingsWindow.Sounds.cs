@@ -107,7 +107,7 @@ public partial class SettingsWindow
         catch (OperationCanceledException)
         {
             _soundRewardsLoaded = false;
-            ShowLine(RewardSoundListStatus, "Не дождался ответа Twitch, открой вкладку ещё раз.");
+            ShowLine(RewardSoundListStatus, "Не дождался ответа Twitch, открой раздел ещё раз.");
         }
         catch (Exception ex)
         {

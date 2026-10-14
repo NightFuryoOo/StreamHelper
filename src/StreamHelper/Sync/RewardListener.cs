@@ -15,7 +15,7 @@ public sealed class RewardListener : EventSubListener<Redemption>
         "Награды",
         TwitchClient.RedemptionScope,
         RewardTypes,
-        "Для наград за баллы переподключи Twitch в настройках, вкладка «Twitch»: нужно новое право.");
+        "Для наград за баллы переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.");
 
     public RewardListener(SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<Redemption>, Task> deliver)
         : base(settings, api, url, Feature, deliver)

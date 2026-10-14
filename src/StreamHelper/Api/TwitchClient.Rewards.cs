@@ -350,7 +350,7 @@ public sealed partial class TwitchClient
         if (!Settings.HasManageScope)
         {
             throw new AuthRequiredException(
-                "Для управления наградами переподключи Twitch в настройках, вкладка «Twitch»: нужно право на управление наградами.");
+                "Для управления наградами переподключи Twitch в настройках, раздел «Подключения»: нужно право на управление наградами.");
         }
     }
 }

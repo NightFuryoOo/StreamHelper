@@ -9,11 +9,11 @@ namespace StreamHelper.Ui;
 
 public partial class SettingsWindow
 {
-    private const string ConnectTwitchFirst = "Сначала подключи Twitch во вкладке «Twitch».";
+    private const string ConnectTwitchFirst = "Сначала подключи Twitch в разделе «Подключения».";
 
     private CancellationTokenSource? _twitchCts;
 
-    private static string ReconnectTwitchFor(string right) => $"Переподключи Twitch во вкладке «Twitch»: нужно право на {right}.";
+    private static string ReconnectTwitchFor(string right) => $"Переподключи Twitch в разделе «Подключения»: нужно право на {right}.";
 
     private void RefreshTwitchSummary()
     {
@@ -24,8 +24,10 @@ public partial class SettingsWindow
         if (!settings.HasShoutoutScope) chatMissing.Add("отметок");
         if (!settings.HasChatWriteScope) chatMissing.Add("сообщений в чат");
         var chatRights = chatMissing.Count <= 1 ? string.Join("", chatMissing) : string.Join(", ", chatMissing.Take(chatMissing.Count - 1)) + " и " + chatMissing[^1];
-        ChatModerationText.Text = $"Для {chatRights} переподключи Twitch (вкладка «Twitch»): нужно новое право.";
+        ChatModerationText.Text = $"Для {chatRights} переподключи Twitch в разделе «Подключения»: нужно новое право.";
         ChatModerationText.Visibility = chatRights.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        TwitchConnectButton.Content = settings.HasTwitchTokens ? "Переподключить" : "Подключить Twitch";
+        TwitchDisconnectButton.Visibility = settings.HasTwitchTokens ? Visibility.Visible : Visibility.Collapsed;
         if (!settings.HasTwitchTokens)
         {
             TwitchStatusText.Text = "Twitch не подключён.";
@@ -57,7 +59,7 @@ public partial class SettingsWindow
             TwitchRightsText.Visibility = Visibility.Collapsed;
             return;
         }
-        TwitchRightsText.Text = $"Не хватает прав: {string.Join(", ", missing)}. Нажми «Подключить Twitch» ещё раз.";
+        TwitchRightsText.Text = $"Не хватает прав: {string.Join(", ", missing)}. Нажми «Переподключить».";
         TwitchRightsText.Visibility = Visibility.Visible;
     }
 

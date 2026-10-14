@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using StreamHelper.Api;
+using StreamHelper.Models;
 using StreamHelper.Storage;
 
 namespace StreamHelper.Ui;
@@ -35,13 +36,23 @@ public sealed class LinkPreviewCatalog
         public bool Failed { get; set; }
     }
 
-    public static PreviewTarget? TargetOf(ChatMessage message)
+    public static PreviewTarget? TargetOf(ChatMessage message) => TargetIn(message.Text);
+
+    public static PreviewTarget? TargetIn(string text)
     {
-        foreach (var part in ChatLinks.Split(message.Text))
+        foreach (var part in ChatLinks.Split(text))
         {
             if (part.Link is { } uri && PreviewLinks.Find(uri) is { } target) return target;
         }
         return null;
+    }
+
+    public async Task AttachAsync(Redemption redemption)
+    {
+        if (redemption.HasVideoTitle || TargetIn(redemption.UserInput) is not { } target) return;
+        var clip = target.Kind == PreviewKind.TwitchClip;
+        if (!clip && !redemption.HasVideo) redemption.AttachVideo(target.Url, "", YouTubeImages.Thumbnail(target.Id), clip: false);
+        if (await LoadAsync(target) is { } preview) redemption.AttachVideo(target.Url, preview.Title, preview.ThumbnailUrl, clip);
     }
 
     public LinkPreview? Get(PreviewTarget target) =>
@@ -79,7 +90,8 @@ public sealed class LinkPreviewCatalog
             entry.Failed = true;
             Log.Write($"Link preview failed ({target.Kind} {target.Id}): {ex.Message}");
             return null;
-        }    }
+        }
+    }
 
     private static string KeyOf(PreviewTarget target) => (target.Kind == PreviewKind.TwitchClip ? "clip:" : "video:") + target.Id;
 

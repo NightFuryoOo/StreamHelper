@@ -29,6 +29,7 @@ public partial class SettingsWindow
             PingSwatches.Children.Add(ColorSwatch.Create(this, swatch.Hex, swatch.Name, "Цвет пингов: " + swatch.Name, () => SetPingColor(swatch.Hex)));
         }
         RefreshPingColor();
+        RefreshPingSummary();
     }
 
     private void SetPingColor(string hex)
@@ -36,6 +37,7 @@ public partial class SettingsWindow
         _services.Settings.Current.ChatPingColor = HexColor.Normalize(hex) ?? AppSettings.DefaultPingColor;
         _services.Settings.Save();
         RefreshPingColor();
+        RefreshPingSummary();
         _services.Chat.Apply();
     }
 
@@ -57,6 +59,7 @@ public partial class SettingsWindow
         _services.Settings.Current.ChatPingHighlight = PingHighlightCheck.IsChecked == true;
         _services.Settings.Save();
         RefreshPingColor();
+        RefreshPingSummary();
         _services.Chat.Apply();
     }
 
@@ -98,6 +101,7 @@ public partial class SettingsWindow
             added = true;
         }
         if (added) _services.Settings.Save();
+        RefreshPingSummary();
         ShowLine(PingWordsStatus, full ? $"Не больше {PingDetector.MaxWords} слов." : "");
         if (!full) PingWordInput.Clear();
         PingWordInput.Focus();
@@ -119,6 +123,7 @@ public partial class SettingsWindow
             added = true;
         }
         if (added) _services.Settings.Save();
+        RefreshPingSummary();
         PingIgnoredInput.Clear();
         PingIgnoredInput.Focus();
     }
@@ -141,6 +146,27 @@ public partial class SettingsWindow
             return;
         }
         _services.Settings.Save();
+        RefreshPingSummary();
+    }
+
+    private void RefreshPingSummary() => PingsSummary.Text = PingSummary(_services.Settings.Current);
+
+    public static string PingSummary(AppSettings settings)
+    {
+        var words = settings.PingWords.Count;
+        var ignored = settings.PingIgnoredChatters.Count;
+        return string.Join(" · ",
+            words == 0 ? "только @ник" : $"@ник и ещё {words} {Words.Plural(words, "слово", "слова", "слов")}",
+            ignored == 0 ? "все аккаунты считаются" : $"{ignored} {Words.Plural(ignored, "аккаунт не считается", "аккаунта не считаются", "аккаунтов не считаются")}",
+            settings.ChatPingHighlight ? "выделяются цветом" : "без цвета");
+    }
+
+    private void OnTogglePings(object sender, RoutedEventArgs e)
+    {
+        var open = PingsPanel.Visibility != Visibility.Visible;
+        PingsPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        PingsChevron.Angle = open ? 180 : 0;
+        if (open) Reveal(PingsPanel);
     }
 
     private void OnResetPingIgnored(object sender, RoutedEventArgs e)
@@ -150,5 +176,6 @@ public partial class SettingsWindow
         _services.Settings.Save();
         _pingIgnored.Clear();
         foreach (var name in settings.PingIgnoredChatters) _pingIgnored.Add(new RemovableEntry(name));
+        RefreshPingSummary();
     }
 }

@@ -297,6 +297,28 @@ public class ChatPlacementTests
         Assert.Equal(expected, ChatPlacement.PausedText(waiting));
     }
 
+    [Theory]
+    [InlineData(0, false, false, false, false)]
+    [InlineData(3, false, false, false, true)]
+    [InlineData(3, true, false, false, false)]
+    [InlineData(3, false, true, false, false)]
+    [InlineData(3, false, false, true, false)]
+    public void The_paused_strip_steps_aside_while_copying_selecting_or_pointing_at_the_bottom(int waiting, bool copied, bool selecting, bool near, bool shown)
+    {
+        Assert.Equal(shown, ChatPlacement.ShowsPausedStrip(waiting, copied, selecting, near));
+    }
+
+    [Theory]
+    [InlineData(300, true)]
+    [InlineData(260, true)]
+    [InlineData(259, false)]
+    [InlineData(330, true)]
+    [InlineData(10, false)]
+    public void The_pointer_is_near_the_paused_strip_in_the_bottom_band_of_the_chat(double y, bool near)
+    {
+        Assert.Equal(near, ChatPlacement.NearPausedStrip(y, 300));
+    }
+
     [Fact]
     public void Without_a_saved_place_the_chat_sits_in_the_bottom_left_corner()
     {
@@ -361,7 +383,7 @@ public class ChatThroughPingListenerTests
         var pings = new List<string>();
         var listener = new PingListener(settings, new FakeEventSubApi(), server.Url(), items =>
         {
-            lock (pings) pings.AddRange(items.Select(p => p.Key));
+            lock (pings) pings.AddRange(items.Select(p => p.Key + ":" + p.ChatterId));
             return Task.CompletedTask;
         }, feed.Push)
         {
@@ -379,7 +401,7 @@ public class ChatThroughPingListenerTests
             Assert.Equal(new[] { "m1", "m2", "m3" }, feed.Recent().Select(m => m.MessageId).ToArray());
             Assert.Equal("#00FF7F", feed.Recent()[0].Color);
             Assert.Equal(new[] { true, false, false }, feed.Recent().Select(m => m.IsPing).ToArray());
-            lock (pings) Assert.Equal(new[] { "m1" }, pings.ToArray());
+            lock (pings) Assert.Equal(new[] { "m1:42" }, pings.ToArray());
         }
         finally
         {

@@ -59,7 +59,8 @@ public partial class ChatOverlayWindow : Window
     private ShoutoutLimits _shoutouts = new();
     private bool _shouting;
     private bool _draining;
-    private bool _menuOpen;
+    private ContextMenu? _menu;
+    private bool _pointerNearStrip;
     private double _actionsGutter;
     private IntPtr _handle;
     private bool _positioning;
@@ -90,7 +91,17 @@ public partial class ChatOverlayWindow : Window
             _front.Stop();
         };
         _idle.Tick += (_, _) => SetInteractive(false);
-        PreviewMouseMove += (_, _) => RestartIdle();
+        PreviewMouseMove += (_, e) =>
+        {
+            RestartIdle();
+            TrackPausedStripPointer(e);
+        };
+        MouseLeave += (_, _) =>
+        {
+            if (!_pointerNearStrip) return;
+            _pointerNearStrip = false;
+            UpdatePausedStrip();
+        };
         PreviewMouseDown += (_, _) => RestartIdle();
         AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler(OnLinkClicked));
         PreviewMouseWheel += OnChatWheel;
@@ -172,7 +183,11 @@ public partial class ChatOverlayWindow : Window
 
     public void SetPositioning(bool on)
     {
-        if (on) EndTyping(returnFocus: true);
+        if (on)
+        {
+            EndTyping(returnFocus: true);
+            CloseMenu();
+        }
         _positioning = on;
         ApplyAppearance();
         PositionLabel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
@@ -203,6 +218,8 @@ public partial class ChatOverlayWindow : Window
         }
 
         _idle.Stop();
+        CloseMenu();
+        _pointerNearStrip = false;
         ClearSelection();
         foreach (var line in _lines)
         {
@@ -243,9 +260,17 @@ public partial class ChatOverlayWindow : Window
         ScrollThumb.Visibility = Visibility.Visible;
     }
 
+    public void ReshowOver(IntPtr front)
+    {
+        if (!IsVisible || _fadingOut || _handle == IntPtr.Zero || _interactive || _positioning || _typing || MenuOpen) return;
+        Log.Write($"Chat over a fullscreen window ({NativeMethods.ClassOf(front)}): shown={NativeMethods.IsShown(_handle)}, " +
+                  $"topmost={NativeMethods.IsTopmost(_handle)}, under it={NativeMethods.IsAbove(front, _handle)}; showing again");
+        FullscreenWatch.ShowAgainOnTop(this, _handle);
+    }
+
     private void KeepInFront()
     {
-        if (!IsVisible || _handle == IntPtr.Zero || _menuOpen || _interactive || _positioning) return;
+        if (!IsVisible || _handle == IntPtr.Zero || MenuOpen || _interactive || _positioning) return;
         if (Application.Current?.Windows.OfType<Window>().Any(w => !ReferenceEquals(w, this) && w.IsActive) == true) return;
         NativeMethods.KeepOnTop(_handle);
     }
@@ -261,7 +286,9 @@ public partial class ChatOverlayWindow : Window
         _actionsGutter = Math.Ceiling(width) + 8;
         return _actionsGutter;
     }
-    private void RestartIdle()    {
+
+    private void RestartIdle()
+    {
         if (!_interactive) return;
         _idle.Stop();
         _idle.Start();
@@ -377,8 +404,17 @@ public partial class ChatOverlayWindow : Window
     private void UpdatePausedStrip()
     {
         var waiting = Paused ? _pending.Count : 0;
-        PausedStrip.Visibility = waiting > 0 ? Visibility.Visible : Visibility.Collapsed;
+        var shown = ChatPlacement.ShowsPausedStrip(waiting, CopiedStrip.Visibility == Visibility.Visible, _selecting || HasSelection, _pointerNearStrip);
+        PausedStrip.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         if (waiting > 0) PausedText.Text = ChatPlacement.PausedText(waiting);
+    }
+
+    private void TrackPausedStripPointer(MouseEventArgs e)
+    {
+        var near = _interactive && ChatPlacement.NearPausedStrip(e.GetPosition(Viewport).Y, Viewport.ActualHeight);
+        if (near == _pointerNearStrip) return;
+        _pointerNearStrip = near;
+        UpdatePausedStrip();
     }
 
     private void Render(ChatMessage message)

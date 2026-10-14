@@ -11,6 +11,7 @@ namespace StreamHelper.Ui;
 public sealed class Services
 {
     private SettingsWindow? _settingsWindow;
+    private HelpWindow? _helpWindow;
 
     public required SettingsStore Settings { get; init; }
     public required DonationStore Donations { get; init; }
@@ -32,6 +33,7 @@ public sealed class Services
     public required UpdateService Updates { get; init; }
     public required VoteWatcher Votes { get; init; }
     public required RewardMuteSwitch RewardMute { get; init; }
+    public LinkPreviewCatalog? Previews { get; init; }
 
     public DonationPoller Poller { get; set; } = null!;
     public DonatePayPoller DonatePayPoller { get; set; } = null!;
@@ -287,5 +289,28 @@ public sealed class Services
         _settingsWindow.Show();
         _settingsWindow.Activate();
         NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_settingsWindow).Handle);
+    }
+
+    public void OpenSettings(string page)
+    {
+        OpenSettings();
+        _settingsWindow?.GoToPage(page);
+    }
+
+    public void OpenHelp(string? section = null)
+    {
+        if (_helpWindow is { IsLoaded: true })
+        {
+            if (_helpWindow.WindowState == WindowState.Minimized) _helpWindow.WindowState = WindowState.Normal;
+            if (section != null) _helpWindow.Select(section);
+            _helpWindow.Activate();
+            NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_helpWindow).Handle);
+            return;
+        }
+        _helpWindow = new HelpWindow(this, section);
+        _helpWindow.Closed += (_, _) => _helpWindow = null;
+        _helpWindow.Show();
+        _helpWindow.Activate();
+        NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_helpWindow).Handle);
     }
 }

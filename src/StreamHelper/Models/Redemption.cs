@@ -31,6 +31,10 @@ public sealed class Redemption : ISeenItem, ISelectable
     private bool _confirmingReject;
     private bool _isBusy;
     private bool _selected;
+    private string? _videoUrl;
+    private string? _videoTitle;
+    private string? _videoThumbnail;
+    private bool _videoIsClip;
     public string Key { get; set; } = "";
     public string Login { get; set; } = "";
     public string DisplayName { get; set; } = "";
@@ -39,6 +43,72 @@ public sealed class Redemption : ISeenItem, ISelectable
     public long Cost { get; set; }
     public string UserInput { get; set; } = "";
     public DateTime AtUtc { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoUrl
+    {
+        get => _videoUrl;
+        set
+        {
+            if (_videoUrl == value) return;
+            _videoUrl = value;
+            Raise();
+            Raise(nameof(HasVideo));
+            Raise(nameof(VideoName));
+        }
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoTitle
+    {
+        get => _videoTitle;
+        set
+        {
+            if (_videoTitle == value) return;
+            _videoTitle = value;
+            Raise();
+            Raise(nameof(VideoName));
+        }
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VideoThumbnail
+    {
+        get => _videoThumbnail;
+        set
+        {
+            if (_videoThumbnail == value) return;
+            _videoThumbnail = value;
+            Raise();
+        }
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool VideoIsClip
+    {
+        get => _videoIsClip;
+        set
+        {
+            if (_videoIsClip == value) return;
+            _videoIsClip = value;
+            Raise();
+            Raise(nameof(VideoLabel));
+            Raise(nameof(VideoName));
+        }
+    }
+
+    [JsonIgnore] public bool HasVideo => !string.IsNullOrEmpty(_videoUrl);
+    [JsonIgnore] public string VideoLabel => _videoIsClip ? "Клип Twitch" : "Видео YouTube";
+    [JsonIgnore] public string VideoName => (_videoIsClip ? "Клип: " : "Видео: ") + (_videoTitle ?? _videoUrl ?? "");
+    [JsonIgnore] public bool HasVideoTitle => HasVideo && !string.IsNullOrEmpty(_videoTitle) && _videoTitle != _videoUrl;
+
+    public void AttachVideo(string url, string title, string thumbnail, bool clip)
+    {
+        VideoIsClip = clip;
+        VideoThumbnail = thumbnail.Length > 0 ? thumbnail : null;
+        VideoTitle = title.Length > 0 ? title : url;
+        VideoUrl = url;
+    }
 
     public bool Seen
     {

@@ -18,6 +18,7 @@ public sealed class ChatPing : ISeenItem, ISelectable
     private bool _selected;
 
     public string Key { get; set; } = "";
+    public string ChatterId { get; set; } = "";
     public string Login { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string Message { get; set; } = "";

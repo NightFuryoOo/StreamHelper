@@ -140,4 +140,81 @@ internal static class NativeMethods
 
     public static void KeepOnTop(IntPtr hwnd) =>
         SetWindowPos(hwnd, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate | SwpShowWindow);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect Work;
+        public uint Flags;
+    }
+
+    private const int WsExTopmost = 0x00000008;
+    private const uint MonitorDefaultToNearest = 2;
+    private const uint GwHwndPrev = 3;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder name, int max);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hwnd, uint command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
+
+    public static (Rect Window, Rect Monitor)? Placement(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var window)) return null;
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return null;
+        return (window, info.Monitor);
+    }
+
+    public static string ClassOf(IntPtr hwnd)
+    {
+        var name = new System.Text.StringBuilder(256);
+        return hwnd != IntPtr.Zero && GetClassName(hwnd, name, name.Capacity) > 0 ? name.ToString() : "";
+    }
+
+    public static uint ProcessOf(IntPtr hwnd) => hwnd != IntPtr.Zero && GetWindowThreadProcessId(hwnd, out var id) != 0 ? id : 0;
+
+    public static bool IsShown(IntPtr hwnd) => IsWindowVisible(hwnd);
+
+    public static bool IsTopmost(IntPtr hwnd) => (GetWindowLong(hwnd, GwlExStyle) & WsExTopmost) != 0;
+
+    public static bool IsAbove(IntPtr upper, IntPtr window)
+    {
+        var steps = 0;
+        for (var hwnd = GetWindow(window, GwHwndPrev); hwnd != IntPtr.Zero && steps < 5000; hwnd = GetWindow(hwnd, GwHwndPrev), steps++)
+        {
+            if (hwnd == upper) return true;
+        }
+        return false;
+    }
 }
