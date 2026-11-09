@@ -10,7 +10,7 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Sync;
 
-public sealed record EventSubOptionalType(string Type, string Scope);
+public sealed record EventSubOptionalType(string Type, string Scope, bool NotAsViewer = false);
 
 public sealed record EventSubFeature(
     string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage, bool FollowsChannel = false,
@@ -220,7 +220,8 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
         if (_feature.OptionalTypes == null) return;
         foreach (var optional in _feature.OptionalTypes)
         {
-            if (!_settings.Current.HasScope(optional.Scope)) continue;
+            var settings = _settings.Current;
+            if (!settings.HasScope(optional.Scope) || optional.NotAsViewer && settings.IsViewerChannel) continue;
             try
             {
                 await _api.CreateSubscriptionAsync(optional.Type, sessionId, ct);

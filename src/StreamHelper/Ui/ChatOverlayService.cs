@@ -24,6 +24,7 @@ public sealed class ChatOverlayService : IPositionable
     private readonly ChatterDirectory? _present;
     private readonly ChatViewers? _viewers;
     private readonly LinkPreviewCatalog? _previews;
+    private readonly PinWatcher _pins;
     private readonly System.Windows.Threading.DispatcherTimer _viewerTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private ChatOverlayWindow? _window;
     private ChatHistoryWindow? _history;
@@ -54,8 +55,11 @@ public sealed class ChatOverlayService : IPositionable
         _feed = feed;
         _badges = badges;
         _moderation = moderation;
+        _pins = new PinWatcher(moderation, () => settings.Current);
+        _pins.Changed += () => _window?.ShowPin(_pins.Pinned);
         feed.Message += OnMessage;
         feed.Deleted += OnDeleted;
+        feed.Moderated += OnModerated;
     }
 
     public bool IsPositioning => _positioning;
@@ -76,6 +80,7 @@ public sealed class ChatOverlayService : IPositionable
             window.ApplyAppearance();
             window.Present();
             WatchViewers(true);
+            _pins.Watch(true);
         }
         else
         {
@@ -83,6 +88,7 @@ public sealed class ChatOverlayService : IPositionable
             _window?.SetInteractive(false);
             _window?.FadeOut();
             WatchViewers(false);
+            _pins.Watch(false);
         }
     }
 
@@ -157,6 +163,7 @@ public sealed class ChatOverlayService : IPositionable
         _history?.Close();
         _viewers?.Clear();
         RefreshViewers();
+        _pins.Reset();
         if (_window == null) return;
         _window.ResetChannel();
         _window.ShowVotes(null, null);
@@ -168,8 +175,10 @@ public sealed class ChatOverlayService : IPositionable
     {
         _feed.Message -= OnMessage;
         _feed.Deleted -= OnDeleted;
+        _feed.Moderated -= OnModerated;
         _watcher.Changed -= OnVotesChanged;
         _viewerTimer.Stop();
+        _pins.Stop();
         _history?.Close();
         _window?.Close();
         _window = null;
@@ -185,14 +194,18 @@ public sealed class ChatOverlayService : IPositionable
         window.GeometryChanged += window.SaveGeometry;
         window.HistoryRequested += message => _ = OpenHistoryAsync(message);
         window.MessageDeleted += OnChatMessageDeleted;
+        window.Moderated += _feed.Moderate;
+        window.PinChanged += _pins.Show;
         _window = window;
         foreach (var message in _feed.Recent())
         {
             if (_feed.IsDeleted(message.MessageId)) window.ShowDeleted(message.MessageId);
+            if (_feed.ModerationOf(message.MessageId) is { } moderation) window.ShowModeration(message.MessageId, moderation);
             window.AddMessage(message);
         }
         window.ShowVotes(_watcher.Poll, _watcher.Prediction);
         window.ShowViewers(_viewers?.Stream);
+        window.ShowPin(_pins.Pinned);
         return window;
     }
 
@@ -247,7 +260,20 @@ public sealed class ChatOverlayService : IPositionable
             foreach (var id in ids)
             {
                 _window?.ShowDeleted(id);
-                _history?.ShowDeleted(id);
+                _history?.ShowChanged(id);
+            }
+        });
+    }
+
+    private void OnModerated(IReadOnlyList<string> ids, ChatModeration moderation)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        dispatcher?.InvokeAsync(() =>
+        {
+            foreach (var id in ids)
+            {
+                _window?.ShowModeration(id, moderation);
+                _history?.ShowChanged(id);
             }
         });
     }

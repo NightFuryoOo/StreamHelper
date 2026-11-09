@@ -22,6 +22,7 @@ public partial class App : Application
     private EventWaitHandle? _showSignal;
     private HttpClient? _http;
     private Services? _services;
+    private ToastMerger? _toastMerger;
     private TrayIcon? _tray;
     private FullscreenWatch? _fullscreen;
     private string[] _args = Array.Empty<string>();
@@ -176,7 +177,8 @@ public partial class App : Application
             twitch,
             new YouTubeClient(_http, Environment.GetEnvironmentVariable("STREAMHELPER_YOUTUBE_URL"), Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL")),
             images);
-        var emotes = new ChatEmotes(extraEmotes, images, twitchEndpoints, new EmoteLibrary(twitch, extraEmotes, settings, twitchEndpoints));
+        var emotes = new ChatEmotes(extraEmotes, images, twitchEndpoints, new EmoteLibrary(twitch, extraEmotes, settings, twitchEndpoints),
+            ChatEmotes.GifCache(_http), () => settings.Current.ChatGifs);
         var votes = new VoteWatcher(settings, twitch);
 
         var services = new Services
@@ -247,7 +249,7 @@ public partial class App : Application
         Track(services.RewardListener, viewModel.ApplyRewardStatus);
         services.PingListener = new PingListener(
             settings, twitch, eventSubUrl, OnUi<ChatPing>(OnPings), services.ChatFeed.Push,
-            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })), services.ChatFeed.Remove);
+            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })), services.ChatFeed.Remove, services.ChatFeed.Moderate);
         Track(services.PingListener, status => viewModel.ApplyPingStatus(PingListener.TabStatus(status, settings.Current)));
         Track(services.PingListener, status => viewModel.ApplyMomentStatus(PingListener.TabStatus(status, settings.Current)));
     }
@@ -377,8 +379,8 @@ public partial class App : Application
         var settings = services.Settings.Current;
         var shown = added.Where(item => notify(settings, item)).ToList();
         if (shown.Count == 0 || !settings.ShowToast || services.Overlay.IsOpen) return;
-        var text = toast(shown);
-        services.Toasts.Show(text.Title, text.Line, text.Message);
+        _toastMerger ??= new ToastMerger(services.Toasts);
+        _toastMerger.Show(shown, toast);
     }
 
     private void OnDonations(IReadOnlyList<Donation> items)

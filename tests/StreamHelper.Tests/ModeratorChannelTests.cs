@@ -273,7 +273,7 @@ public class ModeratorSyncTests
         {
             Assert.True(await Wait.Until(() => listener.Status.State == SyncState.Ok));
             Assert.Equal("Подключено · streamer · канал Big_Streamer", listener.Status.Message);
-            Assert.Equal(5, api.CallCount);
+            Assert.Equal(7, api.CallCount);
         }
         finally
         {

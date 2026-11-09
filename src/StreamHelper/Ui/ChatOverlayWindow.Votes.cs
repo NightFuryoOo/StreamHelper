@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using StreamHelper.Api;
 using StreamHelper.Models;
@@ -69,7 +70,12 @@ public partial class ChatOverlayWindow
         var now = DateTime.UtcNow;
         Place(VoteKind.Poll, Shown(VoteKind.Poll, _livePoll, now), now);
         Place(VoteKind.Prediction, Shown(VoteKind.Prediction, _livePrediction, now), now);
-        if (_voteCards.Count > 0) _voteClock.Start();
+        UpdateVoteClock();
+    }
+
+    private void UpdateVoteClock()
+    {
+        if (_voteCards.Count > 0 || _pin != null) _voteClock.Start();
         else _voteClock.Stop();
     }
 
@@ -96,7 +102,7 @@ public partial class ChatOverlayWindow
             return;
         }
         if (card != null) _voteCards.Remove(card);
-        var fresh = new VoteCardModel(vote!, now, _interactive);
+        var fresh = new VoteCardModel(vote!, now, _interactive, _settings.Current.ChatVotesCollapsed);
         if (kind == VoteKind.Poll) _voteCards.Insert(0, fresh);
         else _voteCards.Add(fresh);
     }
@@ -106,16 +112,84 @@ public partial class ChatOverlayWindow
         PlaceAll();
         var now = DateTime.UtcNow;
         foreach (var card in _voteCards) card.Tick(now);
+        TickPin(now);
     }
 
     private void SetVotesInteractive(bool on)
     {
         var now = DateTime.UtcNow;
         foreach (var card in _voteCards) card.SetInteractive(on, now);
+        SetPinInteractive(on);
     }
 
     private static VoteCardModel? CardOf(object sender) =>
         TreeWalk.UpFrom(sender as DependencyObject).Select(node => (node as FrameworkElement)?.DataContext).OfType<VoteCardModel>().FirstOrDefault();
+
+    private static FoldCardModel? FoldCardOf(object sender) =>
+        TreeWalk.UpFrom(sender as DependencyObject).Select(node => (node as FrameworkElement)?.DataContext).OfType<FoldCardModel>().FirstOrDefault();
+
+    private void OnVoteFold(object sender, RoutedEventArgs e)
+    {
+        if (FoldCardOf(sender) is not { } card) return;
+        var collapsed = !card.Collapsed;
+        _settings.Current.ChatVotesCollapsed = collapsed;
+        _settings.Save();
+        foreach (var each in _voteCards)
+        {
+            if (collapsed) each.Disarm();
+            Fold(each, BodyOf(each), collapsed);
+        }
+        if (_pin != null) Fold(_pin, PinBody, collapsed);
+        RestartIdle();
+    }
+
+    private static readonly TimeSpan FoldTime = TimeSpan.FromMilliseconds(200);
+
+    private FrameworkElement? BodyOf(VoteCardModel card) =>
+        VoteCards.ItemContainerGenerator.ContainerFromItem(card) is ContentPresenter presenter && presenter.ContentTemplate?.FindName("VoteBody", presenter) is FrameworkElement body
+            ? body
+            : null;
+
+    private void Fold(FoldCardModel card, FrameworkElement? body, bool collapsed)
+    {
+        if (body == null || !IsVisible)
+        {
+            card.KeepBody(false);
+            card.Collapsed = collapsed;
+            return;
+        }
+        var version = (body.Tag as int? ?? 0) + 1;
+        body.Tag = version;
+        var from = card.BodyShown ? body.ActualHeight : 0;
+        double to = 0;
+        if (collapsed)
+        {
+            card.KeepBody(true);
+            card.Collapsed = true;
+        }
+        else
+        {
+            card.Collapsed = false;
+            card.KeepBody(false);
+            body.BeginAnimation(HeightProperty, null);
+            body.ClearValue(HeightProperty);
+            body.Measure(new Size(((FrameworkElement)body.Parent).ActualWidth, double.PositiveInfinity));
+            to = body.DesiredSize.Height;
+        }
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var height = new DoubleAnimation(from, to, FoldTime) { EasingFunction = ease };
+        height.Completed += (_, _) =>
+        {
+            if (!Equals(body.Tag, version)) return;
+            body.BeginAnimation(HeightProperty, null);
+            body.ClearValue(HeightProperty);
+            body.BeginAnimation(OpacityProperty, null);
+            body.Opacity = 1;
+            if (collapsed) card.KeepBody(false);
+        };
+        body.BeginAnimation(HeightProperty, height);
+        body.BeginAnimation(OpacityProperty, new DoubleAnimation(body.Opacity, collapsed ? 0 : 1, FoldTime) { EasingFunction = ease });
+    }
 
     private async void OnVoteEnd(object sender, RoutedEventArgs e)
     {

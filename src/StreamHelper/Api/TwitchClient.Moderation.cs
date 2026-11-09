@@ -25,6 +25,12 @@ public interface IModerationApi
     Task<ModerationResult> ShoutoutAsync(string userId, CancellationToken ct);
 
     Task<ModerationResult> DeleteChatMessageAsync(string messageId, CancellationToken ct);
+
+    Task<PinCheck> GetPinnedAsync(CancellationToken ct);
+
+    Task<ModerationResult> PinAsync(string messageId, int? durationSeconds, CancellationToken ct);
+
+    Task<ModerationResult> UnpinAsync(string messageId, CancellationToken ct);
 }
 
 public sealed partial class TwitchClient

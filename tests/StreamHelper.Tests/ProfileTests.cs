@@ -60,10 +60,10 @@ public class ProfileTests
         return store;
     }
 
-    private static string Export(TempDir dir, SettingsStore store, bool lists, string name = "p.shprofile")
+    private static string Export(TempDir dir, SettingsStore store, bool lists, string name = "p.shprofile", bool sounds = true)
     {
         var path = dir.File(name);
-        var result = Profile.Export(path, store.ToJson(), dir.Path, lists, "1.2.3", Now.ToUniversalTime());
+        var result = Profile.Export(path, store.ToJson(), dir.Path, lists, sounds, "1.2.3", Now.ToUniversalTime());
         Assert.True(result.Success, result.Error);
         return path;
     }
@@ -340,7 +340,7 @@ public class ProfileTests
         store.Current.RewardSounds["orig-3"] = new RewardSound { File = "r-orig-3.wav", Name = "нет.wav" };
         store.Save();
 
-        var result = Profile.Export(dir.File("p.shprofile"), store.ToJson(), dir.Path, false, "1.2.3", Now.ToUniversalTime());
+        var result = Profile.Export(dir.File("p.shprofile"), store.ToJson(), dir.Path, false, true, "1.2.3", Now.ToUniversalTime());
 
         Assert.True(result.Success);
         Assert.Equal(1, result.MissingSounds);
@@ -351,7 +351,7 @@ public class ProfileTests
     [Fact]
     public void The_confirmation_names_the_date_channel_and_lists_and_warns_about_another_channel()
     {
-        var info = new ProfileInfo { CreatedUtc = Now.ToUniversalTime(), TwitchUserId = "111", TwitchLogin = "source_channel", HasLists = true };
+        var info = new ProfileInfo { CreatedUtc = Now.ToUniversalTime(), TwitchUserId = "111", TwitchLogin = "source_channel", HasLists = true, HasSounds = true };
 
         var same = ProfileTexts.Confirm(info, "111");
         var other = ProfileTexts.Confirm(info, "222");
@@ -421,6 +421,97 @@ public class ProfileTests
     public void The_suggested_file_name_has_the_date()
     {
         Assert.Equal("StreamHelper профиль 2026-10-09.shprofile", ProfileTexts.DefaultFileName(Now));
+    }
+
+    [Fact]
+    public void Without_sounds_the_file_has_no_sound_files_sound_settings_or_sound_keys()
+    {
+        using var dir = new TempDir();
+        var store = Source(dir);
+        store.Current.SetHotkey(AppSettings.RewardHotkeyKey("orig-1"), AppSettings.ModControl, 0x72);
+        store.Save();
+
+        var path = dir.File("p.shprofile");
+        var result = Profile.Export(path, store.ToJson(), dir.Path, false, false, "1.2.3", Now.ToUniversalTime());
+
+        Assert.True(result.Success, result.Error);
+        using (var zip = ZipFile.OpenRead(path)) Assert.DoesNotContain(zip.Entries, e => e.FullName.StartsWith("alerts/"));
+        var settings = EntryText(path, "settings.json");
+        Assert.DoesNotContain("\"RewardSounds\"", settings);
+        Assert.DoesNotContain("\"SoundRewardIds\"", settings);
+        Assert.DoesNotContain(AppSettings.RewardHotkeyPrefix, settings);
+        Assert.Contains("\"Donations\"", settings);
+        Assert.False(result.Info!.HasSounds);
+        Assert.Equal(0, result.Info.Sounds);
+        Assert.False(Profile.Read(path).Info!.HasSounds);
+        Assert.True(Profile.Read(Export(dir, store, lists: false, "with.shprofile")).Info!.HasSounds);
+        Assert.Equal("Профиль сохранён без звуков наград: p.shprofile", ProfileTexts.Saved("p.shprofile", result));
+    }
+
+    [Fact]
+    public void Loading_a_profile_without_sounds_keeps_this_computers_sounds_and_their_keys()
+    {
+        using var source = new TempDir();
+        using var target = new TempDir();
+        var path = Export(source, Source(source), lists: false, sounds: false);
+        var store = Target(target);
+        var t = store.Current;
+        t.RewardSounds["t-1"] = new RewardSound { File = "r-t-1.wav", Name = "мой.wav", Volume = 0.9 };
+        t.RewardSounds["t-2"] = new RewardSound { File = "r-t-2.wav", Name = "второй.wav" };
+        t.SoundRewardIds = new List<string> { "t-1", "t-2" };
+        t.SetHotkey(AppSettings.RewardHotkeyKey("t-1"), AppSettings.ModControl, 0x71);
+        t.SetHotkey(AppSettings.RewardHotkeyKey("t-2"), AppSettings.ModControl, 0x70);
+        store.Save();
+        Directory.CreateDirectory(Path.Combine(target.Path, "alerts"));
+        File.WriteAllBytes(Path.Combine(target.Path, "alerts", "r-t-1.wav"), new byte[] { 9, 9 });
+
+        var result = LoadInto(target, path);
+
+        Assert.True(result.Success, result.Error);
+        var s = new SettingsStore(target.File("settings.json")).Current;
+        Assert.Equal(17, s.ToastSeconds);
+        Assert.Equal(0x70u, s.GetHotkey(HotkeyAction.Donations).VirtualKey);
+        Assert.Equal(new[] { "t-1", "t-2" }, s.RewardSounds.Keys.OrderBy(k => k));
+        Assert.Equal(0.9, s.RewardSounds["t-1"].Volume);
+        Assert.Equal(new[] { "t-1", "t-2" }, s.SoundRewardIds);
+        Assert.Equal(0x71u, s.GetHotkey(AppSettings.RewardHotkeyKey("t-1")).VirtualKey);
+        Assert.False(s.GetHotkey(AppSettings.RewardHotkeyKey("t-2")).IsSet);
+        Assert.Equal(new byte[] { 9, 9 }, File.ReadAllBytes(Path.Combine(target.Path, "alerts", "r-t-1.wav")));
+        Assert.False(File.Exists(Path.Combine(target.Path, "alerts", "r-orig-1.mp3")));
+    }
+
+    [Fact]
+    public void A_profile_with_sounds_still_replaces_the_sound_keys()
+    {
+        using var source = new TempDir();
+        using var target = new TempDir();
+        var sourceStore = Source(source);
+        sourceStore.Current.SetHotkey(AppSettings.RewardHotkeyKey("orig-1"), AppSettings.ModControl, 0x72);
+        sourceStore.Save();
+        var path = Export(source, sourceStore, lists: false);
+        var store = Target(target);
+        store.Current.RewardSounds["t-1"] = new RewardSound { File = "r-t-1.wav", Name = "мой.wav" };
+        store.Current.SetHotkey(AppSettings.RewardHotkeyKey("t-1"), AppSettings.ModControl, 0x71);
+        store.Save();
+
+        LoadInto(target, path);
+
+        var s = new SettingsStore(target.File("settings.json")).Current;
+        Assert.Equal(new[] { "orig-1" }, s.RewardSounds.Keys);
+        Assert.Equal(0x72u, s.GetHotkey(AppSettings.RewardHotkeyKey("orig-1")).VirtualKey);
+        Assert.False(s.GetHotkey(AppSettings.RewardHotkeyKey("t-1")).IsSet);
+    }
+
+    [Fact]
+    public void The_confirmation_says_when_a_profile_has_no_sounds()
+    {
+        var with = new ProfileInfo { CreatedUtc = Now.ToUniversalTime(), HasSounds = true };
+        var without = new ProfileInfo { CreatedUtc = Now.ToUniversalTime(), TwitchLogin = "c", HasLists = true };
+
+        Assert.DoesNotContain("звуков", ProfileTexts.Confirm(with, ""));
+        var text = ProfileTexts.Confirm(without, "");
+        Assert.StartsWith("Загрузить профиль от 09.10.2026 12:30, канал c, со списками, без звуков наград?", text);
+        Assert.Contains("на этом компьютере они останутся как есть", text);
     }
 
     private static void RewriteEntry(string zipPath, string entry, Func<string, string> change)

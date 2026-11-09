@@ -257,7 +257,7 @@ public class EmoteLibraryTests
     [Fact]
     public void The_emotes_right_is_requested_last()
     {
-        Assert.EndsWith(" bits:read user:read:emotes moderator:read:chatters", TwitchClient.Scopes);
+        Assert.EndsWith(" bits:read user:read:emotes moderator:read:chatters channel:moderate", TwitchClient.Scopes);
         Assert.True(new AppSettings { TwitchScopes = "user:read:emotes" }.HasEmotesScope);
         Assert.False(new AppSettings().HasEmotesScope);
     }

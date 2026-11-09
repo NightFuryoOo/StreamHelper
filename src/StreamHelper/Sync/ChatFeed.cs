@@ -21,10 +21,14 @@ public sealed class ChatFeed
     private readonly Queue<string> _idOrder = new();
     private readonly HashSet<string> _ids = new();
     private readonly HashSet<string> _deleted = new();
+    private readonly Dictionary<string, ChatModeration> _moderated = new();
+    private readonly Dictionary<string, ChatModerationKind> _lastAction = new();
 
     public event Action<ChatMessage>? Message;
 
     public event Action<IReadOnlyList<string>>? Deleted;
+
+    public event Action<IReadOnlyList<string>, ChatModeration>? Moderated;
 
     public void Push(ChatMessage message)
     {
@@ -53,7 +57,41 @@ public sealed class ChatFeed
             _idOrder.Clear();
             _ids.Clear();
             _deleted.Clear();
+            _moderated.Clear();
+            _lastAction.Clear();
         }
+    }
+
+    public void Moderate(ChatModeration moderation)
+    {
+        var login = moderation.UserLogin.ToLowerInvariant();
+        var who = moderation.UserId.Length > 0 ? moderation.UserId : login;
+        if (who.Length == 0) return;
+        var ids = new List<string>();
+        var applied = moderation;
+        lock (_gate)
+        {
+            if (moderation.Kind == ChatModerationKind.Lift)
+            {
+                if (!_lastAction.Remove(who, out var lifted)) return;
+                applied = moderation with { Lifted = lifted };
+            }
+            else _lastAction[who] = moderation.Kind;
+            foreach (var message in _history)
+            {
+                if (message.MessageId.Length == 0 || !IsAuthor(message, moderation.UserId, login)) continue;
+                if (applied.Kind == ChatModerationKind.Lift && !_moderated.ContainsKey(message.MessageId)) continue;
+                _moderated[message.MessageId] = applied;
+                ids.Add(message.MessageId);
+            }
+        }
+        if (ids.Count > 0) Moderated?.Invoke(ids, applied);
+    }
+
+    public ChatModeration? ModerationOf(string messageId)
+    {
+        if (messageId.Length == 0) return null;
+        lock (_gate) return _moderated.GetValueOrDefault(messageId);
     }
 
     public void MarkDeleted(string messageId)

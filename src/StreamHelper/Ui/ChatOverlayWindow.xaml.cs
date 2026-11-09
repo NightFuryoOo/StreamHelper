@@ -53,6 +53,8 @@ public partial class ChatOverlayWindow : Window
     private readonly Queue<ChatMessage> _pending = new();
     private readonly List<ChatLine> _lines = new();
     private readonly HashSet<string> _deletedIds = new();
+    private readonly Dictionary<string, ChatModeration> _moderations = new();
+    private bool? _gifsShown;
     private readonly DispatcherTimer _idle = new() { Interval = IdleExit };
 
     private readonly DispatcherTimer _front = new() { Interval = TimeSpan.FromSeconds(3) };
@@ -89,6 +91,7 @@ public partial class ChatOverlayWindow : Window
             _badges.Loaded -= OnBadgesLoaded;
             _idle.Stop();
             _front.Stop();
+            _pinAnimator?.Stop();
         };
         _idle.Tick += (_, _) => SetInteractive(false);
         PreviewMouseMove += (_, e) =>
@@ -263,8 +266,13 @@ public partial class ChatOverlayWindow : Window
     public void ReshowOver(IntPtr front)
     {
         if (!IsVisible || _fadingOut || _handle == IntPtr.Zero || _interactive || _positioning || _typing || MenuOpen) return;
-        Log.Write($"Chat over a fullscreen window ({NativeMethods.ClassOf(front)}): shown={NativeMethods.IsShown(_handle)}, " +
-                  $"topmost={NativeMethods.IsTopmost(_handle)}, under it={NativeMethods.IsAbove(front, _handle)}; showing again");
+        var shown = NativeMethods.IsShown(_handle);
+        var topmost = NativeMethods.IsTopmost(_handle);
+        var under = NativeMethods.IsAbove(front, _handle);
+        if (!shown || !topmost || under)
+        {
+            Log.Write($"Chat over a fullscreen window ({NativeMethods.ClassOf(front)}): shown={shown}, topmost={topmost}, under it={under}; showing again");
+        }
         FullscreenWatch.ShowAgainOnTop(this, _handle);
     }
 
@@ -316,6 +324,8 @@ public partial class ChatOverlayWindow : Window
         var size = ChatPlacement.ClampFontSize(settings.ChatFontSize);
         ApplyViewersSize(size);
         ApplyPreviews(size);
+        ApplyGifs();
+        ApplyTimes(size);
         foreach (var line in _lines)
         {
             line.Box.Background = PlateFor(line.Message);
@@ -428,7 +438,7 @@ public partial class ChatOverlayWindow : Window
         var nickBrush = Frozen(new SolidColorBrush(Color.FromRgb(r, g, b)));
         text.Inlines.Add(new Run(name) { FontWeight = FontWeights.Bold, Foreground = nickBrush });
         text.Inlines.Add(new Run(": "));
-        var content = _emotes.Inlines(message, size);
+        var content = _emotes.Inlines(message, size, Animator);
         foreach (var inline in content) text.Inlines.Add(inline);
 
         var root = new Grid { Background = Brushes.Transparent };
@@ -448,6 +458,7 @@ public partial class ChatOverlayWindow : Window
             Margin = new Thickness(0, 0, 0, 2),
         };
         var line = new ChatLine(message, root, box, text, nickBrush) { Reply = reply, Content = content, Body = body, Highlight = highlight };
+        if (_settings.Current.ChatShowTime) ShowTime(line, size);
         text.SizeChanged += (_, _) => RepaintSelection(line);
         if (CanModerate(message)) AddActions(line);
         box.MouseRightButtonUp += (_, e) =>
@@ -457,6 +468,7 @@ public partial class ChatOverlayWindow : Window
             ShowNickMenu(line);
         };
 
+        var appearMs = _scroll > 0 || !IsVisible || _fadingOut ? 0 : ChatPlacement.ClampAppearMs(_settings.Current.ChatAppearMs);
         if (_scroll > 0)
         {
             box.Loaded += (_, _) =>
@@ -464,12 +476,9 @@ public partial class ChatOverlayWindow : Window
                 if (_scroll > 0) SetScroll(_scroll + box.ActualHeight + box.Margin.Bottom);
             };
         }
-        else if (IsVisible && !_fadingOut && ChatPlacement.ClampAppearMs(_settings.Current.ChatAppearMs) is > 0 and var appearMs)
-        {
-            Appear(box, TimeSpan.FromMilliseconds(appearMs));
-        }
         Lines.Children.Add(box);
         _lines.Add(line);
+        if (_moderations.TryGetValue(message.MessageId, out var moderation)) ApplyModeration(line, moderation);
         if (_deletedIds.Contains(message.MessageId)) MarkDeleted(line);
         while (Lines.Children.Count > MaxLines)
         {
@@ -479,19 +488,84 @@ public partial class ChatOverlayWindow : Window
         }
         if (!_emotes.IsComplete(message)) _ = FillLateEmotesAsync(line);
         ShowPreview(line);
+        if (appearMs > 0) Slide(box, TimeSpan.FromMilliseconds(appearMs));
     }
 
     private async Task FillLateEmotesAsync(ChatLine line)
     {
         var shown = _emotes.Shown(line.Message);
         await _emotes.CompleteAsync(line.Message);
-        if (_emotes.Shown(line.Message) <= shown || !_lines.Contains(line) || line.Content.Count == 0) return;
-        var fresh = _emotes.Inlines(line.Message, ChatPlacement.ClampFontSize(_settings.Current.ChatFontSize));
+        if (_emotes.Shown(line.Message) <= shown || !_lines.Contains(line)) return;
+        ReplaceContent(line);
+    }
+
+    private void ReplaceContent(ChatLine line)
+    {
+        if (line.Content.Count == 0) return;
+        var fresh = _emotes.Inlines(line.Message, ChatPlacement.ClampFontSize(_settings.Current.ChatFontSize), Animator);
         var anchor = line.Content[0];
         foreach (var inline in fresh) line.Text.Inlines.InsertBefore(anchor, inline);
         foreach (var old in line.Content) line.Text.Inlines.Remove(old);
         line.Content = fresh;
         if (_deletedIds.Contains(line.Message.MessageId)) MarkDeleted(line);
+    }
+
+    private EmoteAnimator? _animator;
+
+    private EmoteAnimator Animator => _animator ??= new EmoteAnimator { Shows = EmoteShown };
+
+    private bool EmoteShown(Image image)
+    {
+        if (!image.IsVisible || Viewport.ActualHeight <= 0) return false;
+        try
+        {
+            var top = image.TransformToAncestor(Viewport).Transform(new Point()).Y;
+            return top + image.ActualHeight > 0 && top < Viewport.ActualHeight;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static void ShowTime(ChatLine line, double size)
+    {
+        if (line.Time != null) return;
+        line.Time = new Run(ChatPlacement.MessageTime(line.Message.AtUtc) + " ") { Foreground = MutedBrush, FontSize = ChatPlacement.TimeSize(size) };
+        if (line.Text.Inlines.FirstInline is { } first) line.Text.Inlines.InsertBefore(first, line.Time);
+        else line.Text.Inlines.Add(line.Time);
+    }
+
+    private void ApplyTimes(double size)
+    {
+        var on = _settings.Current.ChatShowTime;
+        foreach (var line in _lines)
+        {
+            if (on)
+            {
+                ShowTime(line, size);
+                line.Time!.FontSize = ChatPlacement.TimeSize(size);
+            }
+            else if (line.Time != null)
+            {
+                line.Text.Inlines.Remove(line.Time);
+                line.Time = null;
+            }
+        }
+    }
+
+    private void ApplyGifs()
+    {
+        var on = _settings.Current.ChatGifs;
+        if (_gifsShown is { } shown && shown != on)
+        {
+            foreach (var line in _lines.Where(l => ChatEmotes.HasGif(l.Message)))
+            {
+                ReplaceContent(line);
+                if (!_emotes.IsComplete(line.Message)) _ = FillLateEmotesAsync(line);
+            }
+        }
+        _gifsShown = on;
     }
 
     public static double ReplySize(double size) => Math.Round(size * 0.85, 1);
@@ -505,46 +579,46 @@ public partial class ChatOverlayWindow : Window
         return line;
     }
 
-    private void Appear(Border box, TimeSpan duration)
+    private TranslateTransform? _slide;
+
+    private void Slide(Border box, TimeSpan duration)
     {
-        box.Height = 0;
-        box.Opacity = 0;
-        box.ClipToBounds = true;
-        void Start(object sender, RoutedEventArgs e)
+        Lines.UpdateLayout();
+        var shift = box.ActualHeight + box.Margin.Bottom;
+        if (shift <= 0) return;
+        _slide ??= new TranslateTransform();
+        if (!ReferenceEquals(Lines.RenderTransform, _slide)) Lines.RenderTransform = _slide;
+        var from = Math.Min(_slide.Y + shift, Math.Max(shift, Viewport.ActualHeight));
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        _slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(from, 0, duration) { EasingFunction = ease });
+        var fade = new DoubleAnimation(0, 1, duration) { EasingFunction = ease };
+        fade.Completed += (_, _) =>
         {
-            box.Loaded -= Start;
-            var inner = Math.Max(0, Lines.ActualWidth - box.Padding.Left - box.Padding.Right - box.BorderThickness.Left - box.BorderThickness.Right);
-            box.Child.Measure(new Size(inner, double.PositiveInfinity));
-            var target = box.Child.DesiredSize.Height + box.Padding.Top + box.Padding.Bottom + box.BorderThickness.Top + box.BorderThickness.Bottom;
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var grow = new DoubleAnimation(0, target, duration) { EasingFunction = ease };
-            grow.Completed += (_, _) =>
-            {
-                box.BeginAnimation(HeightProperty, null);
-                box.ClearValue(HeightProperty);
-                box.ClipToBounds = false;
-            };
-            var fade = new DoubleAnimation(0, 1, duration) { EasingFunction = ease };
-            fade.Completed += (_, _) =>
-            {
-                box.BeginAnimation(OpacityProperty, null);
-                box.Opacity = 1;
-            };
-            box.BeginAnimation(HeightProperty, grow);
-            box.BeginAnimation(OpacityProperty, fade);
-        }
-        box.Loaded += Start;
+            box.BeginAnimation(OpacityProperty, null);
+            box.Opacity = 1;
+        };
+        box.BeginAnimation(OpacityProperty, fade);
+    }
+
+    private void StopSlide()
+    {
+        if (_slide == null) return;
+        _slide.BeginAnimation(TranslateTransform.YProperty, null);
+        _slide.Y = 0;
     }
 
     public void ResetChannel()
     {
         ClearSelection();
+        HidePin();
         _chatters.Clear();
         HideMentions();
         HideEmotes(focusInput: false);
         Lines.Children.Clear();
+        StopSlide();
         _lines.Clear();
         _deletedIds.Clear();
+        _moderations.Clear();
         _pending.Clear();
         _shown.Clear();
         _shoutouts = new ShoutoutLimits();
@@ -583,6 +657,8 @@ public partial class ChatOverlayWindow : Window
         public IconButton? Remove { get; set; }
         public Run? Status { get; set; }
         public Run? Removed { get; set; }
+        public ChatModeration? Moderation { get; set; }
+        public Run? Time { get; set; }
         public Run? Shout { get; set; }
         public DispatcherTimer? DisarmTimer { get; set; }
         public Armed Armed { get; set; }

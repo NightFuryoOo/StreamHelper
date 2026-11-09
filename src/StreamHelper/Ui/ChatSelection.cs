@@ -30,7 +30,7 @@ public static class ChatSelection
                 at = picture.ElementEnd.CompareTo(to) < 0 ? picture.ElementEnd : to;
                 continue;
             }
-            if (context == TextPointerContext.ElementStart && at.GetAdjacentElement(LogicalDirection.Forward) is LineBreak) text.Append('\n');
+            if (context == TextPointerContext.ElementStart && at.GetAdjacentElement(LogicalDirection.Forward) is LineBreak lineBreak && !ChatEmotes.IsGifBreak(lineBreak)) text.Append('\n');
             at = at.GetNextContextPosition(LogicalDirection.Forward) ?? to;
         }
         return text.ToString();

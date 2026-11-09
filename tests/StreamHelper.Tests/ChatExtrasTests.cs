@@ -126,9 +126,9 @@ public class ChattersTests
     private static HttpClient NewHttp() => new() { Timeout = TimeSpan.FromSeconds(10) };
 
     [Fact]
-    public void The_login_asks_for_the_right_to_see_who_is_in_the_chat_last()
+    public void The_login_asks_for_the_right_to_see_who_is_in_the_chat()
     {
-        Assert.EndsWith(" moderator:read:chatters", TwitchClient.Scopes);
+        Assert.Contains(" moderator:read:chatters ", TwitchClient.Scopes);
         Assert.True(new AppSettings { TwitchScopes = TwitchClient.Scopes }.HasChattersScope);
         Assert.False(new AppSettings { TwitchScopes = "user:read:chat" }.HasChattersScope);
     }

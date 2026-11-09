@@ -41,6 +41,7 @@ public partial class ChatOverlayWindow
             var reply = Item("Ответить");
             reply.Click += (_, _) => Dispatcher.InvokeAsync(() => ReplyTo(line.Message));
             menu.Items.Add(reply);
+            if (CanPin) menu.Items.Add(PinItem(menu, line));
         }
         if (HasSelection)
         {
@@ -242,8 +243,7 @@ public partial class ChatOverlayWindow
                 Arm(line, Armed.Mute);
                 return;
             }
-            var seconds = ChatPlacement.ClampMuteMinutes(_settings.Current.ChatMuteMinutes) * 60;
-            await ModerateAsync(line, seconds, "замучен на " + ChatPlacement.DescribeDuration(seconds));
+            await ModerateAsync(line, ChatPlacement.ClampMuteMinutes(_settings.Current.ChatMuteMinutes) * 60);
         };
         custom.Button.Click += async (_, _) => await MuteForChosenTimeAsync(line);
         ban.Button.Click += async (_, _) =>
@@ -253,7 +253,7 @@ public partial class ChatOverlayWindow
                 Arm(line, Armed.Ban);
                 return;
             }
-            await ModerateAsync(line, null, "забанен");
+            await ModerateAsync(line, null);
         };
         undo.Button.Click += async (_, _) => await LiftAsync(line);
 
@@ -284,7 +284,7 @@ public partial class ChatOverlayWindow
             if (previous != IntPtr.Zero && previous != _handle && NativeMethods.Exists(previous)) NativeMethods.SetForegroundWindow(previous);
             RestartIdle();
         }
-        if (seconds is { } chosen) await ModerateAsync(line, chosen, "замучен на " + ChatPlacement.DescribeDuration(chosen));
+        if (seconds is { } chosen) await ModerateAsync(line, chosen);
     }
 
     private void Arm(ChatLine line, Armed kind)
@@ -317,7 +317,39 @@ public partial class ChatOverlayWindow
         line.Remove?.ShowIdle();
     }
 
-    private async Task ModerateAsync(ChatLine line, int? seconds, string doneText)
+    public event Action<ChatModeration>? Moderated;
+
+    private ChatModeration MyAction(ChatLine line, ChatModerationKind kind, int seconds = 0) =>
+        new(kind, line.Message.ChatterId, line.Message.ChatterLogin, _settings.Current.TwitchLogin, seconds);
+
+    public void ShowModeration(string messageId, ChatModeration moderation)
+    {
+        if (messageId.Length == 0) return;
+        _moderations[messageId] = moderation;
+        foreach (var line in _lines)
+        {
+            if (line.Message.MessageId == messageId) ApplyModeration(line, moderation);
+        }
+    }
+
+    private static void ApplyModeration(ChatLine line, ChatModeration moderation)
+    {
+        line.Moderation = moderation;
+        ShowStatus(line, ChatModerationLabel.Unbroken(moderation), DoneBrush);
+        line.Status!.ToolTip = ChatModerationLabel.Tip(moderation);
+        if (line.Removed != null)
+        {
+            line.Text.Inlines.Remove(line.Removed);
+            line.Removed = null;
+        }
+        var active = ChatModerationLabel.IsActive(moderation);
+        SetVisible(line.Mute, !active);
+        SetVisible(line.Custom, !active);
+        SetVisible(line.Ban, !active);
+        SetVisible(line.Undo, active);
+    }
+
+    private async Task ModerateAsync(ChatLine line, int? seconds)
     {
         var chatter = line.Message.ChatterId;
         SetBusy(chatter, true);
@@ -332,7 +364,7 @@ public partial class ChatOverlayWindow
             result = new ModerationResult(false, "Ошибка: " + ex.Message);
         }
         SetBusy(chatter, false);
-        if (result.Success) MarkModerated(chatter, doneText);
+        if (result.Success) Moderated?.Invoke(seconds is { } muted ? MyAction(line, ChatModerationKind.Timeout, muted) : MyAction(line, ChatModerationKind.Ban));
         else ShowStatus(line, result.Message, ErrorBrush);
         Disarm(line);
         RestartIdle();
@@ -380,11 +412,11 @@ public partial class ChatOverlayWindow
         SetVisible(line.Remove, false);
         foreach (var inline in line.Text.Inlines.ToList())
         {
-            if (!ReferenceEquals(inline, line.Status)) inline.TextDecorations = TextDecorations.Strikethrough;
+            if (!ReferenceEquals(inline, line.Status) && !ReferenceEquals(inline, line.Removed) && !ReferenceEquals(inline, line.Time)) inline.TextDecorations = TextDecorations.Strikethrough;
         }
         line.Text.Opacity = 0.55;
         if (line.Card != null) line.Card.Root.Opacity = 0.55;
-        if (line.Removed != null) return;
+        if (line.Removed != null || line.Moderation != null) return;
         line.Removed = new Run("  · удалено") { Foreground = DoneBrush, FontSize = line.Text.FontSize * 0.9 };
         line.Text.Inlines.Add(line.Removed);
     }
@@ -404,7 +436,7 @@ public partial class ChatOverlayWindow
             result = new ModerationResult(false, "Ошибка: " + ex.Message);
         }
         SetBusy(chatter, false);
-        if (result.Success) MarkLifted(chatter);
+        if (result.Success) Moderated?.Invoke(MyAction(line, ChatModerationKind.Lift));
         else ShowStatus(line, result.Message, ErrorBrush);
         RestartIdle();
     }
@@ -422,30 +454,6 @@ public partial class ChatOverlayWindow
         }
     }
 
-    private void MarkModerated(string chatterId, string text)
-    {
-        foreach (var line in LinesOf(chatterId))
-        {
-            ShowStatus(line, text, DoneBrush);
-            SetVisible(line.Mute, false);
-            SetVisible(line.Custom, false);
-            SetVisible(line.Ban, false);
-            SetVisible(line.Undo, true);
-        }
-    }
-
-    private void MarkLifted(string chatterId)
-    {
-        foreach (var line in LinesOf(chatterId))
-        {
-            ClearStatus(line);
-            SetVisible(line.Mute, true);
-            SetVisible(line.Custom, true);
-            SetVisible(line.Ban, true);
-            SetVisible(line.Undo, false);
-        }
-    }
-
     private static void SetVisible(IconButton? button, bool visible)
     {
         if (button != null) button.Button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
@@ -454,7 +462,7 @@ public partial class ChatOverlayWindow
     private static void ShowStatus(ChatLine line, string text, Brush brush)
     {
         ClearStatus(line);
-        line.Status = new Run("  · " + text) { Foreground = brush, FontSize = line.Text.FontSize * 0.9 };
+        line.Status = new Run("  ·\u00A0" + text) { Foreground = brush, FontSize = line.Text.FontSize * 0.9 };
         line.Text.Inlines.Add(line.Status);
     }
 

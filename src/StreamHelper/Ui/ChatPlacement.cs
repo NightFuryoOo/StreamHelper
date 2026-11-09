@@ -41,6 +41,10 @@ public static class ChatPlacement
 
     public static string PausedText(int waiting) => $"Чат на паузе · новых: {waiting}";
 
+    public static string MessageTime(DateTime atUtc) => atUtc.ToLocalTime().ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    public static double TimeSize(double fontSize) => Math.Round(fontSize * 0.85, 1);
+
     public const double PausedStripZone = 40;
 
     public static bool NearPausedStrip(double pointerY, double viewportHeight) => pointerY >= viewportHeight - PausedStripZone;

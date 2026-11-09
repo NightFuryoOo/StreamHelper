@@ -58,6 +58,36 @@ public static class VoteCardText
         return best <= 0 ? new HashSet<string>() : vote.Options.Where(o => o.Votes == best).Select(o => o.Id).ToHashSet();
     }
 
+    public static string Leader(ChannelVote vote)
+    {
+        if (vote.Options.Count == 0) return "";
+        var percents = Percents(vote);
+        var winners = Winners(vote);
+        if (vote.Stage == VoteStage.Ended && winners.Count == 0) return "";
+        var best = 0;
+        for (var i = 1; i < vote.Options.Count; i++)
+        {
+            if (winners.Count > 0 ? winners.Contains(vote.Options[i].Id) && !winners.Contains(vote.Options[best].Id) : percents[i] > percents[best]) best = i;
+        }
+        if (winners.Count == 0 && percents[best] == 0) return "";
+        return $"{(winners.Count > 0 ? "✓ " : "")}{vote.Options[best].Title} {percents[best]}%";
+    }
+
+    public static string ShortStatus(ChannelVote vote, DateTime now)
+    {
+        switch (vote.Stage)
+        {
+            case VoteStage.Active:
+                if (vote.EndsUtc is not { } ends) return "";
+                var left = ends - now;
+                return left <= TimeSpan.Zero ? "…" : Clock(left);
+            case VoteStage.Locked:
+                return "ставки закрыты";
+            default:
+                return vote.IsCanceled ? "отменён" : "итог";
+        }
+    }
+
     public static bool StillShown(ChannelVote? vote, DateTime now) =>
         vote != null && (vote.Stage != VoteStage.Ended || (vote.EndedUtc is { } ended && now - ended < VoteWatcher.ShowEndedFor));
 
@@ -166,7 +196,50 @@ public sealed class VoteRowModel : VoteModelBase
 
 }
 
-public sealed class VoteCardModel : VoteModelBase
+public abstract class FoldCardModel : VoteModelBase
+{
+    private bool _collapsed;
+    private bool _keepBody;
+
+    protected FoldCardModel(bool collapsed) => _collapsed = collapsed;
+
+    public bool Collapsed
+    {
+        get => _collapsed;
+        set
+        {
+            if (_collapsed == value) return;
+            _collapsed = value;
+            foreach (var name in FoldNames()) Raise(name);
+        }
+    }
+
+    protected virtual IEnumerable<string> FoldNames() =>
+        new[] { nameof(Collapsed), nameof(Expanded), nameof(BodyShown), nameof(FoldGlyph), nameof(FoldName), nameof(CardPadding) };
+
+    public bool Expanded => !_collapsed;
+
+    public bool BodyShown => !_collapsed || _keepBody;
+
+    public void KeepBody(bool keep)
+    {
+        if (_keepBody == keep) return;
+        _keepBody = keep;
+        Raise(nameof(BodyShown));
+    }
+
+    public string FoldGlyph => _collapsed ? "▸" : "▾";
+
+    public string FoldName => _collapsed ? "Развернуть" : "Свернуть";
+
+    public Thickness CardPadding => _collapsed ? new Thickness(8, 3, 10, 3) : new Thickness(8, 6, 10, 8);
+
+    public virtual void Disarm()
+    {
+    }
+}
+
+public sealed class VoteCardModel : FoldCardModel
 {
     private ChannelVote _vote;
     private string _header = "";
@@ -175,13 +248,36 @@ public sealed class VoteCardModel : VoteModelBase
     private bool _busy;
     private bool _interactive;
     private bool _cancelArmed;
+    private string _leader = "";
+    private string _short = "";
 
-    public VoteCardModel(ChannelVote vote, DateTime now, bool interactive)
+    public VoteCardModel(ChannelVote vote, DateTime now, bool interactive, bool collapsed = false) : base(collapsed)
     {
         _vote = vote;
         _interactive = interactive;
         Update(vote, now, interactive);
     }
+
+    protected override IEnumerable<string> FoldNames() =>
+        base.FoldNames().Concat(new[] { nameof(ShowLeader), nameof(ShownStatus), nameof(TitleWrapping) });
+
+    public string Leader
+    {
+        get => _leader;
+        private set => Set(ref _leader, value, nameof(Leader), nameof(ShowLeader));
+    }
+
+    public bool ShowLeader => Collapsed && _leader.Length > 0;
+
+    public string ShortStatus
+    {
+        get => _short;
+        private set => Set(ref _short, value, nameof(ShortStatus), nameof(ShownStatus));
+    }
+
+    public string ShownStatus => Collapsed ? _short : Status;
+
+    public TextWrapping TitleWrapping => Collapsed ? TextWrapping.NoWrap : TextWrapping.Wrap;
 
     public ChannelVote Vote => _vote;
 
@@ -198,7 +294,7 @@ public sealed class VoteCardModel : VoteModelBase
     public string Status
     {
         get => _status;
-        private set => Set(ref _status, value);
+        private set => Set(ref _status, value, nameof(Status), nameof(ShownStatus));
     }
 
     public string Error
@@ -240,7 +336,9 @@ public sealed class VoteCardModel : VoteModelBase
         _interactive = interactive;
         if (stageChanged) Disarm();
         Header = VoteCardText.Header(vote);
+        Leader = VoteCardText.Leader(vote);
         Status = VoteCardText.Status(vote, now);
+        ShortStatus = VoteCardText.ShortStatus(vote, now);
         var percents = VoteCardText.Percents(vote);
         var winners = VoteCardText.Winners(vote);
         var ids = vote.Options.Select(o => o.Id).ToList();
@@ -262,7 +360,11 @@ public sealed class VoteCardModel : VoteModelBase
         Raise(nameof(ShowButtons));
     }
 
-    public void Tick(DateTime now) => Status = VoteCardText.Status(_vote, now);
+    public void Tick(DateTime now)
+    {
+        Status = VoteCardText.Status(_vote, now);
+        ShortStatus = VoteCardText.ShortStatus(_vote, now);
+    }
 
     public void SetInteractive(bool interactive, DateTime now)
     {
@@ -270,7 +372,7 @@ public sealed class VoteCardModel : VoteModelBase
         Update(_vote, now, interactive);
     }
 
-    public void Disarm()
+    public override void Disarm()
     {
         CancelArmed = false;
         foreach (var row in Rows) row.Armed = false;

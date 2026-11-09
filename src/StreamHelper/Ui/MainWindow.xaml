@@ -486,6 +486,29 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="CardList" TargetType="ItemsControl">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+            <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" CanContentScroll="True" Focusable="False" Padding="{TemplateBinding Padding}">
+                            <ItemsPresenter/>
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ResizeThumb" TargetType="Thumb">
             <Setter Property="Template">
                 <Setter.Value>
@@ -611,9 +634,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Donations.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Donations.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             Visibility="{Binding DonationSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <DockPanel>
@@ -655,9 +676,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Moments.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Moments.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             Visibility="{Binding MomentSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <DockPanel>
@@ -699,9 +718,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Followers.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Followers.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             Visibility="{Binding FollowerSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <DockPanel>
@@ -743,9 +760,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Subscribers.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Subscribers.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             Visibility="{Binding SubscriberSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <DockPanel>
@@ -787,9 +802,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Redemptions.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Redemptions.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             IsEnabled="{Binding RewardsIdle}" Visibility="{Binding RewardSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <Grid>
@@ -849,9 +862,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,4,0" Focusable="False">
-                        <ItemsControl ItemsSource="{Binding Pings.Items}" Margin="0,0,6,6"/>
-                    </ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding Pings.Items}" Style="{StaticResource CardList}" Margin="10,0,4,0" Padding="0,0,6,6"/>
                     <Border Grid.Row="1" Margin="10,2,10,8" Padding="6,3" CornerRadius="8" Background="#323744"
                             Visibility="{Binding PingSelection.HasAny, Converter={StaticResource BoolVis}}">
                         <DockPanel>

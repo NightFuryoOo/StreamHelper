@@ -53,6 +53,7 @@ public partial class SettingsWindow
         if (!settings.HasBitsScope) missing.Add("Bits");
         if (!settings.HasEmotesScope) missing.Add("свои смайлы");
         if (!settings.HasChattersScope) missing.Add("зрители в чате (для @)");
+        if (!settings.HasBanEventsScope) missing.Add("кто забанил или замутил");
         RefreshChannelBlock();
         if (missing.Count == 0)
         {

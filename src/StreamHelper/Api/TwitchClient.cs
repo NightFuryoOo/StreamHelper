@@ -54,6 +54,7 @@ public sealed record TwitchEndpoints(
     public string ChatMessagesUrl => Helix("chat/messages");
 
     public string ModerationChatUrl => Helix("moderation/chat");
+    public string ChatPinsUrl => Helix("chat/pins");
 
     public static TwitchEndpoints FromBase(string baseUrl)
     {
@@ -111,10 +112,11 @@ public sealed partial class TwitchClient : IFollowerSource, IEventSubApi, IRewar
     public const string BitsScope = "bits:read";
     public const string EmotesScope = "user:read:emotes";
     public const string ChattersScope = "moderator:read:chatters";
+    public const string BanEventsScope = "channel:moderate";
     public const int MaxChatMessage = 500;
     public const string Scopes = FollowerScope + " " + SubscriptionScope + " " + RedemptionScope + " " + ManageScope + " " + ChatScope + " " + ModerateScope +
                                  " " + PollScope + " " + PredictionScope + " " + ShoutoutScope + " " + ModeratedChannelsScope + " " + ChatWriteScope + " " + DeleteMessagesScope +
-                                 " " + BitsScope + " " + EmotesScope + " " + ChattersScope;
+                                 " " + BitsScope + " " + EmotesScope + " " + ChattersScope + " " + BanEventsScope;
     private const string DeviceGrant = "urn:ietf:params:oauth:grant-type:device_code";
 
     private readonly SettingsStore _store;

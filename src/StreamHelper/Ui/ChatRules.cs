@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Windows.Input;
 using StreamHelper.Api;
 using StreamHelper.Storage;
 
@@ -9,6 +10,20 @@ namespace StreamHelper.Ui;
 
 public static class ChatRules
 {
+    public static bool IsHotkeyPress(HotkeyBinding binding, Key key, ModifierKeys modifiers) =>
+        binding.IsSet && (uint)KeyInterop.VirtualKeyFromKey(key) == binding.VirtualKey && (uint)modifiers == binding.Modifiers;
+
+    public static readonly HotkeyAction[] KeysWhileTyping = { HotkeyAction.ChatWrite, HotkeyAction.ChatInteract };
+
+    public static HotkeyAction? KeyWhileTyping(AppSettings settings, Key key, ModifierKeys modifiers)
+    {
+        foreach (var action in KeysWhileTyping)
+        {
+            if (IsHotkeyPress(settings.GetHotkey(action), key, modifiers)) return action;
+        }
+        return null;
+    }
+
     public static bool CanModerate(ChatMessage message, AppSettings settings) =>
         !settings.IsViewerChannel && message.ChatterId.Length > 0 && message.ChatterId != settings.TwitchUserId && message.ChatterId != settings.ChannelId;
 

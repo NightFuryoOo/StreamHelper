@@ -1313,9 +1313,17 @@
                                           AutomationProperties.Name="Показывать число зрителей под чатом" Click="OnChatViewersClick">
                                     <TextBlock TextWrapping="Wrap" Text="Показывать число зрителей под чатом"/>
                                 </CheckBox>
+                                <CheckBox x:Name="ChatTimeCheck" Style="{StaticResource SwitchCheck}" Margin="0,10,0,0"
+                                          AutomationProperties.Name="Показывать время сообщений" Click="OnChatTimeClick">
+                                    <TextBlock TextWrapping="Wrap" Text="Показывать время сообщений"/>
+                                </CheckBox>
                                 <CheckBox x:Name="ChatPreviewsCheck" Style="{StaticResource SwitchCheck}" Margin="0,10,0,0"
                                           AutomationProperties.Name="Показывать превью клипов Twitch и видео YouTube" Click="OnChatPreviewsClick">
                                     <TextBlock TextWrapping="Wrap" Text="Показывать превью клипов Twitch и видео YouTube"/>
+                                </CheckBox>
+                                <CheckBox x:Name="ChatGifsCheck" Style="{StaticResource SwitchCheck}" Margin="0,10,0,0"
+                                          AutomationProperties.Name="Показывать гифки" Click="OnChatGifsClick">
+                                    <TextBlock TextWrapping="Wrap" Text="Показывать гифки"/>
                                 </CheckBox>
                                 <Grid Margin="0,14,0,0">
                                     <Grid.ColumnDefinitions>
@@ -1379,6 +1387,8 @@
                                 </WrapPanel>
                                 <CheckBox x:Name="ProfileListsCheck" Style="{StaticResource SwitchCheck}" Content="Включить списки (донаты, заказы наград и т.д.)"
                                           Margin="0,12,0,0"/>
+                                <CheckBox x:Name="ProfileSoundsCheck" Style="{StaticResource SwitchCheck}" Content="Включить звуки наград (файлы звуков и их клавиши)"
+                                          IsChecked="True" Margin="0,6,0,0"/>
                                 <StackPanel x:Name="ProfileConfirmPanel" Visibility="Collapsed" Margin="0,8,0,0">
                                     <TextBlock x:Name="ProfileConfirmText" Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap"/>
                                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">

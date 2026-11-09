@@ -11,8 +11,9 @@ internal static class AudioSessions
 
     private static bool _failed;
 
-    public static void GroupMine(string name)
+    public static int GroupMine(string name)
     {
+        var moved = 0;
         try
         {
             var context = Guid.Empty;
@@ -22,19 +23,21 @@ internal static class AudioSessions
                 var group = Group;
                 session.SetGroupingParam(ref group, ref context);
                 session.SetDisplayName(name, ref context);
+                moved++;
             }
         }
         catch (Exception ex) when (ex is COMException or InvalidCastException)
         {
-            if (_failed) return;
+            if (_failed) return moved;
             _failed = true;
             Log.Write("Grouping the sounds in the volume mixer failed: " + ex.Message);
         }
+        return moved;
     }
 
     private static IEnumerable<IAudioSessionControl2> Mine()
     {
-        var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+        if (Type.GetTypeFromCLSID(EnumeratorClass) is not { } type || Activator.CreateInstance(type) is not IMMDeviceEnumerator enumerator) yield break;
         if (enumerator.GetDefaultAudioEndpoint(0, 1, out var device) != 0) yield break;
         var iid = typeof(IAudioSessionManager2).GUID;
         if (device.Activate(ref iid, 23, IntPtr.Zero, out var manager) != 0) yield break;
@@ -48,10 +51,7 @@ internal static class AudioSessions
         }
     }
 
-    [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-    private class MMDeviceEnumerator
-    {
-    }
+    private static readonly Guid EnumeratorClass = new("BCDE0395-E52F-467C-8E3D-C4579291692E");
 
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IMMDeviceEnumerator

@@ -21,12 +21,30 @@ public partial class SettingsWindow
         ChatAppearText.Text = ChatPlacement.DescribeAppear(ChatPlacement.ClampAppearMs(settings.ChatAppearMs));
         ChatViewersCheck.IsChecked = settings.ChatShowViewers;
         ChatPreviewsCheck.IsChecked = settings.ChatLinkPreviews;
+        ChatGifsCheck.IsChecked = settings.ChatGifs;
+        ChatTimeCheck.IsChecked = settings.ChatShowTime;
+    }
+
+    private void OnChatTimeClick(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ChatShowTime = ChatTimeCheck.IsChecked == true;
+        _services.Settings.Save();
+        _services.Chat.Apply();
     }
 
     private void OnChatPreviewsClick(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
         _services.Settings.Current.ChatLinkPreviews = ChatPreviewsCheck.IsChecked == true;
+        _services.Settings.Save();
+        _services.Chat.Apply();
+    }
+
+    private void OnChatGifsClick(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ChatGifs = ChatGifsCheck.IsChecked == true;
         _services.Settings.Save();
         _services.Chat.Apply();
     }

@@ -52,12 +52,12 @@ public static class EmoteDecoder
 {
     private const int MinDelayMs = 20;
 
-    public static EmoteFrames? Decode(byte[] bytes)
+    public static EmoteFrames? Decode(byte[] bytes, int maxHeight = 0, long maxPixelBytes = 0)
     {
         try
         {
             if (bytes.Length < 8) return null;
-            return bytes[0] == (byte)'G' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F' ? DecodeGif(bytes) : DecodeStill(bytes);
+            return bytes[0] == (byte)'G' && bytes[1] == (byte)'I' && bytes[2] == (byte)'F' ? DecodeGif(bytes, maxHeight, maxPixelBytes) : DecodeStill(bytes, maxHeight);
         }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException or IOException or ArgumentException
                                        or System.Runtime.InteropServices.COMException or FileFormatException)
@@ -67,16 +67,30 @@ public static class EmoteDecoder
         }
     }
 
-    private static EmoteFrames? DecodeStill(byte[] bytes)
+    private static EmoteFrames? DecodeStill(byte[] bytes, int maxHeight)
     {
         var decoder = BitmapDecoder.Create(new MemoryStream(bytes), BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
         if (decoder.Frames.Count == 0) return null;
-        var frame = decoder.Frames[0];
+        BitmapSource frame = decoder.Frames[0];
+        var scale = ScaleFor(frame.PixelHeight, maxHeight);
+        if (scale < 1) frame = Shrunk(new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0), scale);
         frame.Freeze();
-        return new EmoteFrames(new BitmapSource[] { frame }, new[] { 1000 });
+        return new EmoteFrames(new[] { frame }, new[] { 1000 });
     }
 
-    private static EmoteFrames? DecodeGif(byte[] bytes)
+    private static double ScaleFor(int height, int maxHeight) => maxHeight > 0 && height > maxHeight ? (double)maxHeight / height : 1;
+
+    private static BitmapSource Shrunk(BitmapSource source, double scale)
+    {
+        var scaled = new TransformedBitmap(source, new ScaleTransform(scale, scale));
+        var width = scaled.PixelWidth;
+        var height = scaled.PixelHeight;
+        var pixels = new byte[width * height * 4];
+        scaled.CopyPixels(pixels, width * 4, 0);
+        return BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4);
+    }
+
+    private static EmoteFrames? DecodeGif(byte[] bytes, int maxHeight, long maxPixelBytes)
     {
         var decoder = new GifBitmapDecoder(new MemoryStream(bytes), BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
         var source = decoder.Frames;
@@ -104,6 +118,10 @@ public static class EmoteDecoder
         var previousRect = (Left: 0, Top: 0, Width: 0, Height: 0);
         var frames = new List<BitmapSource>(source.Count);
         var delays = new List<int>(source.Count);
+        var scale = ScaleFor(height, maxHeight);
+        var frameBytes = (long)Math.Max(1, Math.Round(width * scale)) * Math.Max(1, Math.Round(height * scale)) * 4;
+        var step = maxPixelBytes > 0 ? Math.Max(1, (int)Math.Ceiling(source.Count * frameBytes / (double)maxPixelBytes)) : 1;
+        var index = 0;
 
         foreach (var frame in source)
         {
@@ -143,10 +161,15 @@ public static class EmoteDecoder
                 }
             }
 
-            var shot = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, (byte[])canvas.Clone(), width * 4);
-            shot.Freeze();
-            frames.Add(shot);
-            delays.Add(delay);
+            if (index++ % step == 0)
+            {
+                var shot = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, (byte[])canvas.Clone(), width * 4);
+                if (scale < 1) shot = Shrunk(shot, scale);
+                shot.Freeze();
+                frames.Add(shot);
+                delays.Add(delay);
+            }
+            else delays[^1] += delay;
 
             previousDisposal = disposal;
             previousRect = (left, top, w, h);
@@ -179,14 +202,21 @@ public static class EmoteDecoder
 
 public sealed class ImageCache
 {
-    private const int MaxBytes = 3 * 1024 * 1024;
-    private const int KeepAtMost = 400;
     private static readonly TimeSpan RetryAfter = TimeSpan.FromMinutes(1);
 
     private readonly HttpClient _http;
+    private readonly int _keepAtMost;
+    private readonly long _maxBytes;
+    private readonly Func<byte[], EmoteFrames?> _decode;
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
 
-    public ImageCache(HttpClient http) => _http = http;
+    public ImageCache(HttpClient http, int keepAtMost = 400, long maxBytes = 3 * 1024 * 1024, Func<byte[], EmoteFrames?>? decode = null)
+    {
+        _http = http;
+        _keepAtMost = keepAtMost;
+        _maxBytes = maxBytes;
+        _decode = decode ?? (bytes => EmoteDecoder.Decode(bytes));
+    }
 
     private sealed class Entry
     {
@@ -224,7 +254,7 @@ public sealed class ImageCache
                 return entry.Task;
             }
         }
-        if (_entries.Count >= KeepAtMost) Trim();
+        if (_entries.Count >= _keepAtMost) Trim();
         var fresh = new Entry(FetchAsync(url), Interlocked.Increment(ref _clock));
         _entries[url] = fresh;
         return fresh.Task;
@@ -232,7 +262,7 @@ public sealed class ImageCache
 
     private void Trim()
     {
-        var oldest = _entries.Where(pair => pair.Value.Task.IsCompleted).OrderBy(pair => pair.Value.Used).Take(_entries.Count - KeepAtMost * 3 / 4).ToList();
+        var oldest = _entries.Where(pair => pair.Value.Task.IsCompleted).OrderBy(pair => pair.Value.Used).Take(_entries.Count - _keepAtMost * 3 / 4).ToList();
         foreach (var pair in oldest) _entries.TryRemove(pair.Key, out _);
     }
 
@@ -242,10 +272,10 @@ public sealed class ImageCache
         {
             using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) return null;
-            if (response.Content.Headers.ContentLength is > MaxBytes) return null;
+            if (response.Content.Headers.ContentLength > _maxBytes) return null;
             var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-            if (bytes.Length > MaxBytes) return null;
-            return await Task.Run(() => EmoteDecoder.Decode(bytes)).ConfigureAwait(false);
+            if (bytes.Length > _maxBytes) return null;
+            return await Task.Run(() => _decode(bytes)).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException or IOException)
         {
@@ -282,6 +312,8 @@ public sealed class EmoteAnimator
         _timer.Tick += (_, _) => Step();
     }
 
+    public Func<Image, bool>? Shows { get; init; }
+
     public void Add(Image image, EmoteFrames frames)
     {
         if (!frames.IsAnimated) return;
@@ -298,6 +330,7 @@ public sealed class EmoteAnimator
     {
         var now = _clock.ElapsedMilliseconds;
         var anyAlive = false;
+        var shows = Shows;
         for (var i = _items.Count - 1; i >= 0; i--)
         {
             var item = _items[i];
@@ -307,10 +340,12 @@ public sealed class EmoteAnimator
                 continue;
             }
             anyAlive = true;
+            if (shows != null && !shows(image)) continue;
             var index = item.Frames.FrameAt(now);
             if (index == item.Shown) continue;
             item.Shown = index;
-            image.Source = item.Frames.Frames[index];
+            if (image is EmoteImage emote) emote.ShowFrame(item.Frames.Frames[index]);
+            else image.Source = item.Frames.Frames[index];
         }
         if (!anyAlive) _timer.Stop();
     }

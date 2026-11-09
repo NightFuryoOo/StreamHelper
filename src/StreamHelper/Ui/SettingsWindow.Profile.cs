@@ -60,7 +60,7 @@ public partial class SettingsWindow
 
         var result = Profile.Export(
             dialog.FileName, _services.Settings.ToJson(), AppPaths.Directory, ProfileListsCheck.IsChecked == true,
-            AppVersion.Current, DateTime.UtcNow);
+            ProfileSoundsCheck.IsChecked == true, AppVersion.Current, DateTime.UtcNow);
         if (!result.Success) Log.Write("Saving the profile failed: " + result.Error);
         ShowProfileStatus(ProfileTexts.Saved(dialog.FileName, result), result.Success ? dialog.FileName : null);
     }

@@ -263,6 +263,9 @@ public sealed class AppSettings
     public int ChatMuteMinutes { get; set; } = 10;
     public bool ChatShowViewers { get; set; } = true;
     public bool ChatLinkPreviews { get; set; } = true;
+    public bool ChatGifs { get; set; } = true;
+    public bool ChatShowTime { get; set; }
+    public bool ChatVotesCollapsed { get; set; }
     public double? ChatLeft { get; set; }
     public double? ChatTop { get; set; }
     public double? ChatWidth { get; set; }
@@ -441,6 +444,9 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool HasChattersScope => HasScope("moderator:read:chatters");
+
+    [JsonIgnore]
+    public bool HasBanEventsScope => HasScope("channel:moderate");
 
     [JsonIgnore]
     public string RedirectUri => $"http://127.0.0.1:{RedirectPort}/callback";

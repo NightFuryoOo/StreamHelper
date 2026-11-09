@@ -19,6 +19,7 @@ public sealed class ProfileInfo
     public string TwitchLogin { get; set; } = "";
     public List<string> Connected { get; set; } = new();
     public bool HasLists { get; set; }
+    public bool HasSounds { get; set; }
     public int Sounds { get; set; }
 }
 
@@ -50,6 +51,8 @@ public static class Profile
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     public static readonly string[] ListFiles = { "donations.json", "followers.json", "subscribers.json", "redemptions.json", "pings.json", "raids.json" };
+
+    public static readonly string[] SoundSettings = { nameof(AppSettings.RewardSounds), nameof(AppSettings.SoundRewardIds) };
 
     public static readonly string[] LocalSettings =
     {
@@ -117,6 +120,9 @@ public static class Profile
         nameof(AppSettings.ChatMuteMinutes),
         nameof(AppSettings.ChatShowViewers),
         nameof(AppSettings.ChatLinkPreviews),
+        nameof(AppSettings.ChatGifs),
+        nameof(AppSettings.ChatShowTime),
+        nameof(AppSettings.ChatVotesCollapsed),
         nameof(AppSettings.ChatLeft),
         nameof(AppSettings.ChatTop),
         nameof(AppSettings.ChatWidth),
@@ -165,7 +171,7 @@ public static class Profile
         return connected;
     }
 
-    public static ProfileResult Export(string path, string settingsJson, string dataDirectory, bool includeLists, string appVersion, DateTime nowUtc)
+    public static ProfileResult Export(string path, string settingsJson, string dataDirectory, bool includeLists, bool includeSounds, string appVersion, DateTime nowUtc)
     {
         var tmp = path + ".tmp";
         try
@@ -174,7 +180,12 @@ public static class Profile
             var shared = new JsonObject();
             foreach (var name in SharedSettings)
             {
+                if (!includeSounds && SoundSettings.Contains(name)) continue;
                 if (all.TryGetPropertyValue(name, out var value)) shared[name] = value?.DeepClone();
+            }
+            if (!includeSounds && shared[nameof(AppSettings.Hotkeys)] is JsonObject hotkeys)
+            {
+                foreach (var key in hotkeys.Select(pair => pair.Key).Where(IsSoundHotkey).ToList()) hotkeys.Remove(key);
             }
 
             var info = new ProfileInfo
@@ -187,6 +198,7 @@ public static class Profile
                 TwitchLogin = Text(all, nameof(AppSettings.TwitchLogin)),
                 Connected = ConnectedServices(all),
                 HasLists = includeLists,
+                HasSounds = includeSounds,
             };
 
             var missing = 0;
@@ -267,7 +279,7 @@ public static class Profile
             Directory.CreateDirectory(BackupsFolder(dataDirectory));
             var path = Path.Combine(BackupsFolder(dataDirectory), $"{title} {now:yyyy-MM-dd HH-mm-ss}{Extension}");
             var current = ReadCurrent(Path.Combine(dataDirectory, "settings.json"));
-            var saved = Export(path, current.ToJsonString(), dataDirectory, includeLists: true, appVersion, now.ToUniversalTime());
+            var saved = Export(path, current.ToJsonString(), dataDirectory, includeLists: true, includeSounds: true, appVersion, now.ToUniversalTime());
             if (saved.Success) PruneBackups(dataDirectory);
             return saved.Success ? saved with { BackupPath = path } : saved;
         }
@@ -291,7 +303,7 @@ public static class Profile
 
             Directory.CreateDirectory(BackupsFolder(dataDirectory));
             backup = Path.Combine(BackupsFolder(dataDirectory), $"До загрузки профиля {now:yyyy-MM-dd HH-mm-ss}{Extension}");
-            var saved = Export(backup, current.ToJsonString(), dataDirectory, includeLists: true, appVersion, now.ToUniversalTime());
+            var saved = Export(backup, current.ToJsonString(), dataDirectory, includeLists: true, includeSounds: true, appVersion, now.ToUniversalTime());
             if (!saved.Success)
             {
                 return new ProfileResult(false, "Не удалось сделать резервную копию текущих настроек, профиль не загружен: " + saved.Error, check.Info);
@@ -332,8 +344,26 @@ public static class Profile
             merged[name] = value?.DeepClone();
         }
         var settings = JsonSerializer.Deserialize<AppSettings>(merged.ToJsonString()) ?? new AppSettings();
+        if (!incoming.ContainsKey(nameof(AppSettings.RewardSounds)))
+        {
+            KeepSoundHotkeys(JsonSerializer.Deserialize<AppSettings>(current.ToJsonString()) ?? new AppSettings(), settings);
+        }
         return JsonSerializer.Serialize(settings, Indented);
     }
+
+    private static void KeepSoundHotkeys(AppSettings before, AppSettings merged)
+    {
+        merged.Hotkeys ??= new Dictionary<string, HotkeyBinding>();
+        foreach (var key in merged.Hotkeys.Keys.Where(IsSoundHotkey).ToList()) merged.Hotkeys.Remove(key);
+        foreach (var (key, binding) in before.Hotkeys ?? new Dictionary<string, HotkeyBinding>())
+        {
+            if (!IsSoundHotkey(key) || binding is not { IsSet: true }) continue;
+            if (merged.FindHotkeyOwner(binding.Modifiers, binding.VirtualKey, key) != null) continue;
+            merged.Hotkeys[key] = binding;
+        }
+    }
+
+    private static bool IsSoundHotkey(string key) => key.StartsWith(AppSettings.RewardHotkeyPrefix, StringComparison.Ordinal);
 
     private static ProfileResult Validate(ZipArchive zip, out JsonObject settings)
     {
@@ -353,6 +383,7 @@ public static class Profile
         Merge(new JsonObject(), settings);
         info.Connected ??= new List<string>();
         info.HasLists = zip.Entries.Any(e => ListName(e.FullName) != null);
+        info.HasSounds = settings.ContainsKey(nameof(AppSettings.RewardSounds));
         info.Sounds = zip.Entries.Count(e => SoundName(e.FullName) != null);
         return new ProfileResult(true, "", info);
     }

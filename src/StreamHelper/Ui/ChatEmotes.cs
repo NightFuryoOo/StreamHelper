@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,22 +18,35 @@ public sealed class ChatEmotes
 {
     public const string ImageTag = "emote";
     public const string GiantTag = "giant-emote";
+    public const string GifTag = "gif";
+    public const string GifBreakTag = "gif-break";
+    public const double GifHeight = 100;
+    public const double GifMaxWidth = 320;
+    public const int GifPixelHeight = 150;
+    public const long GifPixelBudget = 12L * 1024 * 1024;
     private const double GiantScale = 4;
 
     private static readonly TimeSpan PreloadWait = TimeSpan.FromSeconds(3);
 
     private readonly ExtraEmoteCatalog _extra;
     private readonly ImageCache _images;
+    private readonly ImageCache _gifs;
+    private readonly Func<bool> _gifsOn;
     private readonly TwitchEndpoints _endpoints;
     private readonly EmoteAnimator _animator = new();
 
-    public ChatEmotes(ExtraEmoteCatalog extra, ImageCache images, TwitchEndpoints endpoints, EmoteLibrary? library = null)
+    public ChatEmotes(ExtraEmoteCatalog extra, ImageCache images, TwitchEndpoints endpoints, EmoteLibrary? library = null, ImageCache? gifs = null, Func<bool>? gifsOn = null)
     {
         _extra = extra;
         _images = images;
+        _gifs = gifs ?? images;
+        _gifsOn = gifsOn ?? (() => true);
         _endpoints = endpoints;
         Library = library;
     }
+
+    public static ImageCache GifCache(HttpClient http) =>
+        new(http, keepAtMost: 8, maxBytes: 16 * 1024 * 1024, decode: bytes => EmoteDecoder.Decode(bytes, GifPixelHeight, GifPixelBudget));
 
     public EmoteLibrary? Library { get; }
 
@@ -42,9 +56,18 @@ public sealed class ChatEmotes
 
     public static double HeightFor(double fontSize) => Math.Round(fontSize * 1.8);
 
-    public static double HeightFor(double fontSize, object? tag) => tag is GiantTag ? HeightFor(fontSize) * GiantScale : HeightFor(fontSize);
+    public static double HeightFor(double fontSize, object? tag) => tag switch
+    {
+        GiantTag => HeightFor(fontSize) * GiantScale,
+        GifTag => GifHeight,
+        _ => HeightFor(fontSize),
+    };
 
-    public static bool IsEmote(object? tag) => tag is ImageTag or GiantTag;
+    public static bool IsEmote(object? tag) => tag is ImageTag or GiantTag or GifTag;
+
+    public static bool IsGifBreak(Inline inline) => inline is LineBreak { Tag: GifBreakTag };
+
+    public static bool HasGif(ChatMessage message) => message.Fragments?.Any(f => f.Type == "gif" && f.Url.Length > 0) == true;
 
     public Task EnsureCatalogAsync() => _extra.EnsureLoadedAsync();
 
@@ -54,7 +77,7 @@ public sealed class ChatEmotes
         Library?.Reset();
     }
 
-    public sealed record Piece(string Text, string? Url, bool Giant = false);
+    public sealed record Piece(string Text, string? Url, bool Giant = false, bool Gif = false);
 
     private static bool IsTwitchEmote(ChatFragment fragment) => fragment.Type == "emote" && fragment.EmoteId.Length > 0;
 
@@ -78,9 +101,16 @@ public sealed class ChatEmotes
                 if (IsTwitchEmote(fragments[i])) giant = i;
             }
         }
+        var gifs = _gifsOn();
         for (var i = 0; i < fragments.Count; i++)
         {
             var fragment = fragments[i];
+            if (gifs && fragment.Type == "gif" && fragment.Url.Length > 0)
+            {
+                Flush();
+                pieces.Add(new Piece(fragment.Text, fragment.Url, Gif: true));
+                continue;
+            }
             if (IsTwitchEmote(fragment))
             {
                 Flush();
@@ -121,33 +151,39 @@ public sealed class ChatEmotes
 
     public async Task CompleteAsync(ChatMessage message)
     {
-        var loads = Urls(message).Select(_images.LoadAsync).ToList();
+        var loads = Pictures(message).Select(p => p.Cache.LoadAsync(p.Url)).ToList();
         if (_extra.Count == 0)
         {
             await _extra.EnsureLoadedAsync();
-            loads.AddRange(Urls(message).Select(_images.LoadAsync));
+            loads.AddRange(Pictures(message).Select(p => p.Cache.LoadAsync(p.Url)));
         }
         await Task.WhenAll(loads);
     }
 
-    public bool IsComplete(ChatMessage message) => (_extra.Count > 0 || !_extra.IsLoading) && Urls(message).All(url => _images.Get(url) != null);
+    public bool IsComplete(ChatMessage message) => (_extra.Count > 0 || !_extra.IsLoading) && Pictures(message).All(p => p.Cache.Get(p.Url) != null);
 
-    public int Shown(ChatMessage message) => Urls(message).Count(url => _images.Get(url) != null);
+    public int Shown(ChatMessage message) => Pictures(message).Count(p => p.Cache.Get(p.Url) != null);
 
-    private IEnumerable<string> Urls(ChatMessage message) => Pieces(message).Where(p => p.Url != null).Select(p => p.Url!).Distinct();
+    private ImageCache CacheOf(Piece piece) => piece.Gif ? _gifs : _images;
+
+    private IEnumerable<(string Url, ImageCache Cache)> Pictures(ChatMessage message) =>
+        Pieces(message).Where(p => p.Url != null).Select(p => (p.Url!, CacheOf(p))).Distinct();
 
     public List<Inline> Inlines(ChatMessage message, double fontSize, EmoteAnimator? animator = null)
     {
         var inlines = new List<Inline>();
+        var afterGif = false;
         foreach (var piece in Pieces(message))
         {
-            var frames = piece.Url == null ? null : _images.Get(piece.Url);
+            var frames = piece.Url == null ? null : CacheOf(piece).Get(piece.Url);
+            if (afterGif || frames != null && piece.Gif) inlines.Add(new LineBreak { Tag = GifBreakTag });
+            afterGif = frames != null && piece.Gif;
             if (frames == null)
             {
                 AddText(inlines, piece.Text);
                 continue;
             }
-            inlines.Add(Picture(piece.Text, frames, fontSize, piece.Giant ? GiantTag : ImageTag, animator ?? _animator));
+            inlines.Add(Picture(piece.Text, frames, fontSize, piece.Gif ? GifTag : piece.Giant ? GiantTag : ImageTag, animator ?? _animator));
         }
         return inlines;
     }
@@ -169,7 +205,7 @@ public sealed class ChatEmotes
 
     private static InlineUIContainer Picture(string name, EmoteFrames frames, double fontSize, string tag, EmoteAnimator animator)
     {
-        var image = new Image
+        var image = new EmoteImage
         {
             Source = frames.Frames[0],
             Height = HeightFor(fontSize, tag),
@@ -178,9 +214,14 @@ public sealed class ChatEmotes
             Tag = tag,
             ToolTip = name,
         };
+        if (tag == GifTag)
+        {
+            image.MaxWidth = GifMaxWidth;
+            image.Margin = new Thickness(0, 2, 0, 2);
+        }
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
         animator.Add(image, frames);
-        return new InlineUIContainer(image) { BaselineAlignment = BaselineAlignment.Center };
+        return new InlineUIContainer(image) { BaselineAlignment = tag == GifTag ? BaselineAlignment.Bottom : BaselineAlignment.Center };
     }
 
     public void Stop() => _animator.Stop();

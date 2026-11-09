@@ -30,7 +30,10 @@ public sealed class RewardAlertService
     private bool _silentRunning;
     private long _silentReadyAt;
     private DispatcherTimer? _silentStop;
+    private const string MixerName = "StreamHelper";
+    private static readonly TimeSpan RegroupEvery = TimeSpan.FromSeconds(10);
     private DispatcherTimer? _grouping;
+    private DispatcherTimer? _regroup;
     private readonly Dictionary<string, DispatcherTimer> _starts = new(StringComparer.Ordinal);
 
     public RewardAlertService(SettingsStore settings, string? alertsFolder = null)
@@ -276,11 +279,24 @@ public sealed class RewardAlertService
             _grouping.Tick += (_, _) =>
             {
                 _grouping!.Stop();
-                AudioSessions.GroupMine("StreamHelper");
+                AudioSessions.GroupMine(MixerName);
+                KeepGrouped();
             };
         }
         _grouping.Stop();
         _grouping.Start();
+    }
+
+    private void KeepGrouped()
+    {
+        if (_regroup != null) return;
+        _regroup = new DispatcherTimer { Interval = RegroupEvery };
+        _regroup.Tick += (_, _) =>
+        {
+            var moved = AudioSessions.GroupMine(MixerName);
+            if (moved > 0) Log.Write($"Volume mixer: {moved} sound session(s) had left the StreamHelper group, put back.");
+        };
+        _regroup.Start();
     }
     private int WakeOutput()
     {

@@ -134,6 +134,24 @@ public partial class ToastWindow : Window
         }
     }
 
+    public bool IsClosing => _closing || _closed;
+
+    public void Refresh(string title, string line, string? message)
+    {
+        TitleText.Text = title;
+        LineText.Text = line;
+        if (string.IsNullOrWhiteSpace(message)) MessageText.Visibility = Visibility.Collapsed;
+        else
+        {
+            MessageText.Text = message;
+            MessageText.Visibility = Visibility.Visible;
+        }
+        if (_positioning) return;
+        _timer.Stop();
+        _timer.Start();
+        UpdateLayout();
+    }
+
     public void Dismiss()
     {
         if (_closing) return;

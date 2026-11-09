@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using StreamHelper.Api;
 using StreamHelper.Models;
@@ -18,28 +19,37 @@ public sealed class PingListener : EventSubListener<ChatPing>
         new(EventSubParser.ChatClearType, TwitchClient.ChatScope),
     };
 
+    public static readonly EventSubOptionalType[] ModerationTypes =
+    {
+        new(EventSubParser.BanType, TwitchClient.BanEventsScope, NotAsViewer: true),
+        new(EventSubParser.UnbanType, TwitchClient.BanEventsScope, NotAsViewer: true),
+    };
+
     private static readonly EventSubFeature Feature = new(
         "Пинги",
         TwitchClient.ChatScope,
         PingTypes,
         "Для пингов, рейдов и стриков переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.",
         FollowsChannel: true,
-        OptionalTypes: RemovalTypes);
+        OptionalTypes: RemovalTypes.Concat(ModerationTypes).ToArray());
 
     private readonly SettingsStore _settings;
     private readonly Action<ChatMessage>? _onChat;
     private readonly Action<ChannelMoment>? _onMoment;
     private readonly Action<ChatRemoval>? _onRemoval;
+    private readonly Action<ChatModeration>? _onModeration;
 
     public PingListener(
         SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<ChatPing>, Task> deliver,
-        Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null, Action<ChatRemoval>? onRemoval = null)
+        Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null, Action<ChatRemoval>? onRemoval = null,
+        Action<ChatModeration>? onModeration = null)
         : base(settings, api, url, Feature, deliver)
     {
         _settings = settings;
         _onChat = onChat;
         _onMoment = onMoment;
         _onRemoval = onRemoval;
+        _onModeration = onModeration;
     }
 
     public static SyncStatus TabStatus(SyncStatus status, AppSettings settings) =>
@@ -56,6 +66,18 @@ public sealed class PingListener : EventSubListener<ChatPing>
             catch (Exception ex)
             {
                 Log.Write("Chat removal delivery failed: " + ex.Message);
+            }
+            return null;
+        }
+        if (message.Moderation is { } moderation)
+        {
+            try
+            {
+                _onModeration?.Invoke(moderation);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Chat moderation delivery failed: " + ex.Message);
             }
             return null;
         }

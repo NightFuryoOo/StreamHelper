@@ -19,6 +19,7 @@ public partial class ChatOverlayWindow
     private IntPtr _typingReturnTo;
     private ChatMessage? _replyTo;
     private readonly DispatcherTimer _typingWatch = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private bool _dropText;
 
     public event Action<bool>? TypingChanged;
 
@@ -39,6 +40,12 @@ public partial class ChatOverlayWindow
             if (_typing && !IsInside(ComposeBox, e.OriginalSource as DependencyObject) && !IsInside(MentionBox, e.OriginalSource as DependencyObject)) EndTyping(returnFocus: true);
         };
         ComposeText.SelectionChanged += (_, _) => UpdateMentions();
+        ComposeText.PreviewTextInput += (_, e) =>
+        {
+            if (!_dropText) return;
+            _dropText = false;
+            e.Handled = true;
+        };
         Closed += (_, _) => _typingWatch.Stop();
         UpdateCompose();
     }
@@ -79,6 +86,7 @@ public partial class ChatOverlayWindow
     public void BeginTyping()
     {
         if (_positioning || !IsVisible || _fadingOut || _handle == IntPtr.Zero) return;
+        _dropText = false;
         if (!_typing)
         {
             _typing = true;
@@ -173,6 +181,17 @@ public partial class ChatOverlayWindow
 
     private async void OnComposeKeyDown(object sender, KeyEventArgs e)
     {
+        if (ChatRules.KeyWhileTyping(_settings.Current, e.Key == Key.System ? e.SystemKey : e.Key, Keyboard.Modifiers) is { } action)
+        {
+            e.Handled = true;
+            _dropText = true;
+            if (e.IsRepeat) return;
+            HideMentions();
+            var mouse = action == HotkeyAction.ChatInteract;
+            if (!mouse || _interactive) EndTyping(returnFocus: true);
+            if (mouse) SetInteractive(!_interactive);
+            return;
+        }
         if (HandleMentionKey(e))
         {
             e.Handled = true;

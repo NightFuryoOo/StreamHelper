@@ -37,7 +37,7 @@ public partial class ChatHistoryWindow : Window
     private readonly ChatFeed _feed;
     private readonly ChatEmotes _emotes;
     private readonly IModerationApi _moderation;
-    private readonly EmoteAnimator _animator = new(200);
+    private readonly EmoteAnimator _animator;
     private readonly string _key;
     private readonly DateTime? _sinceUtc;
     private readonly HashSet<string> _seen = new();
@@ -57,6 +57,7 @@ public partial class ChatHistoryWindow : Window
         ChatFeed feed, ChatMessage sample, DateTime? sinceUtc, ChatEmotes emotes, IModerationApi moderation, bool canDelete = true,
         LinkPreviewCatalog? previews = null, Func<bool>? previewsOn = null)
     {
+        _animator = new EmoteAnimator(200) { Shows = Shown };
         InitializeComponent();
         _canDelete = canDelete;
         _previews = previews;
@@ -100,6 +101,20 @@ public partial class ChatHistoryWindow : Window
 
     public string ChatterKey => _key;
 
+    private bool Shown(Image image)
+    {
+        if (!image.IsVisible || Box.ActualHeight <= 0) return false;
+        try
+        {
+            var top = image.TransformToAncestor(Box).Transform(new Point()).Y;
+            return top + image.ActualHeight > 0 && top < Box.ActualHeight;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
@@ -137,7 +152,7 @@ public partial class ChatHistoryWindow : Window
         return true;
     }
 
-    public void ShowDeleted(string messageId)
+    public void ShowChanged(string messageId)
     {
         if (_byId.TryGetValue(messageId, out var message)) Refresh(message);
     }
@@ -171,8 +186,13 @@ public partial class ChatHistoryWindow : Window
             paragraph.Inlines.Add(inline);
         }
         _trash.Remove(id);
-        if (deleted) paragraph.Inlines.Add(new Run("  · удалено") { Foreground = DoneBrush, FontSize = 12 });
-        else if (CanDelete(message)) AddTrash(paragraph, message);
+        var moderation = _feed.ModerationOf(id);
+        if (moderation != null)
+        {
+            paragraph.Inlines.Add(new Run("  ·\u00A0" + ChatModerationLabel.Unbroken(moderation)) { Foreground = DoneBrush, FontSize = 12, ToolTip = ChatModerationLabel.Tip(moderation) });
+        }
+        else if (deleted) paragraph.Inlines.Add(new Run("  · удалено") { Foreground = DoneBrush, FontSize = 12 });
+        if (!deleted && CanDelete(message)) AddTrash(paragraph, message);
         if (_errors.TryGetValue(id, out var error)) paragraph.Inlines.Add(new Run("  " + error) { Foreground = ErrorBrush, FontSize = 12 });
         AddPreview(paragraph, message, deleted);
         if (id.Length > 0)

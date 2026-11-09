@@ -6,7 +6,7 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Ui;
 
-public sealed class ToastService : IPositionable
+public sealed class ToastService : IPositionable, IToastSink
 {
     private readonly SettingsStore _settings;
     private readonly List<ToastWindow> _toasts = new();
@@ -20,7 +20,7 @@ public sealed class ToastService : IPositionable
 
     public int Count => _toasts.Count;
 
-    public void Show(string title, string line, string? message)
+    public ToastWindow Show(string title, string line, string? message)
     {
         while (_toasts.Count >= ToastStack.MaxToasts)
         {
@@ -35,6 +35,17 @@ public sealed class ToastService : IPositionable
         };
         _toasts.Add(toast);
         toast.Present(Relayout);
+        return toast;
+    }
+
+    public object Show(ToastText text) => Show(text.Title, text.Line, text.Message);
+
+    public bool Update(object toast, ToastText text)
+    {
+        if (toast is not ToastWindow window || !_toasts.Contains(window) || window.IsClosing) return false;
+        window.Refresh(text.Title, text.Line, text.Message);
+        Relayout();
+        return true;
     }
 
     public void HideNow()

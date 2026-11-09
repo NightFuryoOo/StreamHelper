@@ -371,10 +371,30 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="bd" Background="Transparent" CornerRadius="5" Padding="14,6" MinWidth="130">
-                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
-                        </Border>
+                        <Grid>
+                            <Border x:Name="bd" Background="Transparent" CornerRadius="5" Padding="14,6" MinWidth="130">
+                                <DockPanel>
+                                    <TextBlock x:Name="arrow" DockPanel.Dock="Right" Text="›" Margin="14,0,0,0" Foreground="{StaticResource MutedBrush}" Visibility="Collapsed"/>
+                                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                                </DockPanel>
+                            </Border>
+                            <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="6" VerticalOffset="-5" AllowsTransparency="True" Focusable="False"
+                                   PopupAnimation="None" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Border Background="#262A33" BorderBrush="#3A3F4B" BorderThickness="1" CornerRadius="8" Padding="4">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <ControlTemplate.Triggers>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="arrow" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="Role" Value="TopLevelHeader">
+                                <Setter TargetName="arrow" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#33FFFFFF"/>
+                            </Trigger>
                             <Trigger Property="IsHighlighted" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="#33FFFFFF"/>
                             </Trigger>

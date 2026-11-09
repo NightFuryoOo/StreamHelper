@@ -17,13 +17,14 @@ public sealed record EventSubMessage(
     Redemption? Redemption,
     ChatMessage? Chat = null,
     ChannelMoment? Moment = null,
-    ChatRemoval? Removal = null);
+    ChatRemoval? Removal = null,
+    ChatModeration? Moderation = null);
 
 public sealed record ChatMention(string UserId, string Login, string Name);
 
 public sealed record ChatBadge(string SetId, string Id);
 
-public sealed record ChatFragment(string Type, string Text, string EmoteId = "", bool Animated = false);
+public sealed record ChatFragment(string Type, string Text, string EmoteId = "", bool Animated = false, string Url = "");
 
 public sealed record ChatReply(string ParentMessageId, string ParentUserLogin, string ParentUserName, string ParentText)
 {
@@ -44,6 +45,17 @@ public enum ChatRemovalKind
 
 public sealed record ChatRemoval(ChatRemovalKind Kind, string MessageId = "", string UserId = "", string UserLogin = "");
 
+public enum ChatModerationKind
+{
+    Timeout,
+    Ban,
+    Lift,
+}
+
+public sealed record ChatModeration(
+    ChatModerationKind Kind, string UserId, string UserLogin, string ModeratorName, int Seconds = 0, string Reason = "",
+    ChatModerationKind? Lifted = null);
+
 public static class EventSubParser
 {
     public const string RedemptionType = "channel.channel_points_custom_reward_redemption.add";
@@ -53,10 +65,14 @@ public static class EventSubParser
     public const string ChatDeleteType = "channel.chat.message_delete";
     public const string ChatClearUserType = "channel.chat.clear_user_messages";
     public const string ChatClearType = "channel.chat.clear";
+    public const string BanType = "channel.ban";
+    public const string UnbanType = "channel.unban";
     public const string GiantEmoteKind = "power_ups_gigantified_emote";
 
     public static bool IsChatType(string type) =>
         type is ChatMessageType or ChatNoticeType or ChatDeleteType or ChatClearUserType or ChatClearType;
+
+    public static bool IsBanType(string type) => type is BanType or UnbanType;
 
     public static EventSubMessage? Parse(string json)
     {
@@ -89,6 +105,7 @@ public static class EventSubParser
             ChatMessage? chat = null;
             ChannelMoment? moment = null;
             ChatRemoval? removal = null;
+            ChatModeration? moderation = null;
             if (type == "notification" && payload.ValueKind == JsonValueKind.Object &&
                 payload.TryGetProperty("event", out var ev) && ev.ValueKind == JsonValueKind.Object)
             {
@@ -96,10 +113,11 @@ public static class EventSubParser
                 else if (subscriptionType == ChatMessageType) chat = BuildChat(messageId, timestamp, ev);
                 else if (subscriptionType == ChatNoticeType) moment = BuildMoment(messageId, timestamp, ev);
                 else if (subscriptionType is ChatDeleteType or ChatClearUserType or ChatClearType) removal = BuildRemoval(subscriptionType, ev);
+                else if (IsBanType(subscriptionType)) moderation = BuildModeration(subscriptionType, ev);
                 else subscriber = BuildSubscriber(subscriptionType, messageId, timestamp, ev);
             }
 
-            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment, removal);
+            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment, removal, moderation);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
@@ -107,12 +125,12 @@ public static class EventSubParser
         }
     }
 
-    private static ChatMessage BuildChat(string messageId, DateTime messageAt, JsonElement ev)
+    internal static (string Text, List<ChatMention> Mentions, List<ChatFragment> Parts) ReadBody(JsonElement holder)
     {
         var text = "";
         var mentions = new List<ChatMention>();
         var parts = new List<ChatFragment>();
-        if (ev.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.Object)
+        if (holder.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.Object)
         {
             text = ReadString(message, "text");
             if (message.TryGetProperty("fragments", out var fragments) && fragments.ValueKind == JsonValueKind.Array)
@@ -135,6 +153,11 @@ public static class EventSubParser
                         parts.Add(new ChatFragment("emote", piece, ReadString(emote, "id"), animated));
                         continue;
                     }
+                    if (type == "gif" && GifUrl(fragment) is { } gif)
+                    {
+                        parts.Add(new ChatFragment("gif", piece, Url: gif));
+                        continue;
+                    }
                     parts.Add(new ChatFragment("text", piece));
                     if (type != "mention") continue;
                     if (!fragment.TryGetProperty("mention", out var mention) || mention.ValueKind != JsonValueKind.Object) continue;
@@ -142,6 +165,12 @@ public static class EventSubParser
                 }
             }
         }
+        return (text, mentions, parts);
+    }
+
+    private static ChatMessage BuildChat(string messageId, DateTime messageAt, JsonElement ev)
+    {
+        var (text, mentions, parts) = ReadBody(ev);
 
         var badges = new List<ChatBadge>();
         if (ev.TryGetProperty("badges", out var badgeList) && badgeList.ValueKind == JsonValueKind.Array)
@@ -169,6 +198,13 @@ public static class EventSubParser
             GiantEmote: ReadString(ev, "message_type") == GiantEmoteKind);
     }
 
+    private static string? GifUrl(JsonElement fragment)
+    {
+        if (!fragment.TryGetProperty("gif", out var gif) || gif.ValueKind != JsonValueKind.Object) return null;
+        var url = ReadString(gif, "url");
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps ? url : null;
+    }
+
     private static ChatRemoval? BuildRemoval(string subscriptionType, JsonElement ev)
     {
         switch (subscriptionType)
@@ -183,6 +219,28 @@ public static class EventSubParser
             default:
                 return new ChatRemoval(ChatRemovalKind.All);
         }
+    }
+
+    private static ChatModeration? BuildModeration(string subscriptionType, JsonElement ev)
+    {
+        var userId = ReadString(ev, "user_id");
+        var login = ReadString(ev, "user_login");
+        if (userId.Length == 0 && login.Length == 0) return null;
+        var moderator = ReadString(ev, "moderator_user_name");
+        if (moderator.Length == 0) moderator = ReadString(ev, "moderator_user_login");
+        if (subscriptionType == UnbanType) return new ChatModeration(ChatModerationKind.Lift, userId, login, moderator);
+        var reason = ReadString(ev, "reason").Trim();
+        if (ReadBool(ev, "is_permanent")) return new ChatModeration(ChatModerationKind.Ban, userId, login, moderator, Reason: reason);
+        var seconds = TimeoutSeconds(ReadTimestamp(ev, "banned_at", default), ReadTimestamp(ev, "ends_at", default));
+        return new ChatModeration(ChatModerationKind.Timeout, userId, login, moderator, seconds, reason);
+    }
+
+    private static int TimeoutSeconds(DateTime start, DateTime end)
+    {
+        if (start == default || end <= start) return 0;
+        var seconds = (int)Math.Round((end - start).TotalSeconds);
+        var minutes = (int)Math.Round(seconds / 60.0);
+        return seconds >= 60 && Math.Abs(seconds - minutes * 60) <= 2 ? minutes * 60 : seconds;
     }
 
     private static ChannelMoment? BuildMoment(string messageId, DateTime at, JsonElement ev)

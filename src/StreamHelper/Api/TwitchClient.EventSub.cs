@@ -38,7 +38,7 @@ public sealed partial class TwitchClient
     {
         object condition = EventSubParser.IsChatType(type)
             ? new { broadcaster_user_id = Settings.ChannelId, user_id = Settings.TwitchUserId }
-            : new { broadcaster_user_id = Settings.TwitchUserId };
+            : new { broadcaster_user_id = EventSubParser.IsBanType(type) ? Settings.ChannelId : Settings.TwitchUserId };
         var json = JsonSerializer.Serialize(new
         {
             type,

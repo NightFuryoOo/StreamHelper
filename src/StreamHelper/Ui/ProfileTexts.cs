@@ -22,11 +22,13 @@ public static class ProfileTexts
         var head = "Загрузить профиль от " + info.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
         if (info.TwitchLogin.Length > 0) head += ", канал " + info.TwitchLogin;
         if (info.HasLists) head += ", со списками";
+        if (!info.HasSounds) head += ", без звуков наград";
         var lines = new List<string>
         {
             head + "?",
             "Текущие настройки будут заменены, программа перезапустится. Подключения к сервисам останутся как есть, прежние настройки сохранятся в резервную копию.",
         };
+        if (!info.HasSounds) lines.Add("Звуки наград в профиль не сохранены, на этом компьютере они останутся как есть.");
         if (OtherChannel(info, currentTwitchUserId))
         {
             lines.Add("Профиль сохранён с другого канала Twitch: настройки наград к подключённому каналу не подойдут.");
@@ -37,7 +39,10 @@ public static class ProfileTexts
     public static string Saved(string path, ProfileResult result)
     {
         if (!result.Success) return "Не получилось сохранить профиль: " + result.Error;
-        var text = "Профиль сохранён" + (result.Info?.HasLists == true ? " со списками" : "") + ": " + path;
+        var parts = new List<string>();
+        if (result.Info?.HasLists == true) parts.Add("со списками");
+        if (result.Info is { HasSounds: false }) parts.Add("без звуков наград");
+        var text = "Профиль сохранён" + (parts.Count > 0 ? " " + string.Join(", ", parts) : "") + ": " + path;
         if (result.MissingSounds > 0) text += $"\nНе найдено файлов звуков: {result.MissingSounds}, у этих наград звук не перенесётся.";
         return text;
     }
