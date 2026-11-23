@@ -54,6 +54,7 @@ public partial class SettingsWindow
         if (!settings.HasEmotesScope) missing.Add("свои смайлы");
         if (!settings.HasChattersScope) missing.Add("зрители в чате (для @)");
         if (!settings.HasBanEventsScope) missing.Add("кто забанил или замутил");
+        if (!settings.HasBroadcastScope || !settings.HasClipsScope) missing.Add("название стрима и клипы");
         RefreshChannelBlock();
         if (missing.Count == 0)
         {

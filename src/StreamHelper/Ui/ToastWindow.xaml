@@ -15,6 +15,16 @@
                            Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
                 <TextBlock x:Name="MessageText" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"
                            TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis"/>
+                <DockPanel x:Name="VideoRow" Margin="0,8,0,0" Visibility="Collapsed">
+                    <Border DockPanel.Dock="Left" Width="112" Height="63" CornerRadius="5" Background="#2E3440" Margin="0,0,10,0" ClipToBounds="True">
+                        <Image x:Name="VideoImage" Stretch="UniformToFill"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Заказанное видео" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+                        <TextBlock x:Name="VideoCaption" FontSize="12" Foreground="{StaticResource TextBrush}" Margin="0,2,0,0"
+                                   TextWrapping="Wrap" MaxHeight="34" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </DockPanel>
             </StackPanel>
         </Border>
 

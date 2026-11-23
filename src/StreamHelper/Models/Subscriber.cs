@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using StreamHelper.Storage;
@@ -60,6 +61,98 @@ public sealed class Subscriber : ISeenItem, ISelectable
     public int Bits { get; set; }
     public string PowerUp { get; set; } = "";
     public DateTime AtUtc { get; set; }
+
+    private long? _daAlertId;
+    private bool _alertShowing;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? DaAlertId
+    {
+        get => _daAlertId;
+        set
+        {
+            if (_daAlertId == value) return;
+            _daAlertId = value;
+            Raise();
+            Raise(nameof(CanRepeatAlert));
+        }
+    }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DaAlertType { get; set; }
+
+    [JsonIgnore]
+    public bool AlertShowing
+    {
+        get => _alertShowing;
+        set
+        {
+            if (_alertShowing == value) return;
+            _alertShowing = value;
+            Raise();
+            Raise(nameof(CanRepeatAlert));
+        }
+    }
+
+    [JsonIgnore] public bool CanRepeatAlert => _daAlertId != null && !_alertShowing;
+
+    public void AttachDaAlert(long id, string type)
+    {
+        DaAlertType = type;
+        DaAlertId = id;
+    }
+
+    private bool _recipientsOpen;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Recipients { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GiftBundleId { get; set; }
+
+    [JsonIgnore] public IReadOnlyList<string> RecipientNames => Recipients?.ToArray() ?? Array.Empty<string>();
+
+    [JsonIgnore] public bool HasRecipients => Recipients is { Count: > 0 };
+
+    [JsonIgnore] public bool HasRoomForRecipient => (Recipients?.Count ?? 0) < Math.Max(1, GiftTotal);
+
+    [JsonIgnore]
+    public string RecipientsTitle
+    {
+        get
+        {
+            var count = Recipients?.Count ?? 0;
+            var of = GiftTotal > count ? $" из {GiftTotal}" : "";
+            return $"Кому: {count}{of} {(_recipientsOpen ? "▾" : "▸")}";
+        }
+    }
+
+    [JsonIgnore]
+    public bool RecipientsOpen
+    {
+        get => _recipientsOpen;
+        set
+        {
+            if (_recipientsOpen == value) return;
+            _recipientsOpen = value;
+            Raise();
+            Raise(nameof(RecipientsTitle));
+        }
+    }
+
+    public bool AddRecipient(string name, string bundleId)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        Recipients ??= new List<string>();
+        if (bundleId.Length > 0) GiftBundleId ??= bundleId;
+        if (Recipients.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
+        Recipients.Add(name.Trim());
+        Raise(nameof(Recipients));
+        Raise(nameof(RecipientNames));
+        Raise(nameof(HasRecipients));
+        Raise(nameof(RecipientsTitle));
+        return true;
+    }
 
     public bool Seen
     {

@@ -12,10 +12,17 @@ public partial class SettingsWindow
     private Key? _capturedKey;
 
     private TextBox[] HotkeyBoxes =>
-        new[] { HotkeyDonationsBox, HotkeyFollowersBox, HotkeySubscribersBox, HotkeyRewardsBox, HotkeyPingsBox, HotkeyMomentsBox, HotkeySettingsBox, HotkeyHideToastsBox, HotkeyChatBox, HotkeyChatToggleBox, HotkeyChatWriteBox, HotkeyRewardSoundsBox };
+        new[] { HotkeyDonationsBox, HotkeyFollowersBox, HotkeySubscribersBox, HotkeyRewardsBox, HotkeyPingsBox, HotkeyMomentsBox, HotkeySettingsBox, HotkeyHideToastsBox, HotkeyChatBox, HotkeyChatToggleBox, HotkeyChatWriteBox, HotkeyRewardSoundsBox, HotkeyDaSkipBox, HotkeyDaPauseBox, HotkeyClipBox };
+
+    private void OnClipLinkToChatClick(object sender, RoutedEventArgs e)
+    {
+        _services.Settings.Current.ClipLinkToChat = ClipLinkToChatCheck.IsChecked == true;
+        _services.Settings.Save();
+    }
 
     private void InitHotkeys(AppSettings settings)
     {
+        ClipLinkToChatCheck.IsChecked = settings.ClipLinkToChat;
         foreach (var box in HotkeyBoxes)
         {
             box.TextChanged += (_, _) => UpdateResetCross(box);

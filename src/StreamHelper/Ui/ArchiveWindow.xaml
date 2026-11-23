@@ -1,0 +1,138 @@
+<Window x:Class="StreamHelper.Ui.ArchiveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:StreamHelper.Ui"
+        Title="Архив стримов" Icon="/app_icon.ico" Width="1080" Height="720" MinWidth="760" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#1B1D23" Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI" FontSize="13"
+        PreviewKeyDown="OnPreviewKeyDown">
+
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#262A33"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="#3A3F4B"/>
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Padding" Value="6,5"/>
+        </Style>
+        <Style x:Key="StreamItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="7" Padding="10,8" Margin="0,0,0,2">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#1FFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#2E3340"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="RowItem" TargetType="ListBoxItem">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16,14,16,16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="290"/>
+            <ColumnDefinition Width="16"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                <TextBlock Text="Стримы" Style="{StaticResource PageTitle}"/>
+                <TextBlock x:Name="RecordingText" Style="{StaticResource Note}"/>
+            </StackPanel>
+            <Button DockPanel.Dock="Bottom" Style="{StaticResource FlatButton}" Content="Открыть папку архива" HorizontalAlignment="Left"
+                    Margin="0,8,0,0" Click="OnOpenFolderClick"/>
+            <Grid>
+                <ListBox x:Name="StreamList" Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource StreamItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="OnStreamSelected"
+                         AutomationProperties.Name="Стримы">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Date}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Time}" Foreground="{Binding TimeBrush}" FontSize="12" Margin="0,1,0,0"/>
+                                <TextBlock Text="{Binding Title}" FontSize="12" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding TitleVisibility}"/>
+                                <TextBlock Text="{Binding Counts}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock x:Name="NoStreamsText" Style="{StaticResource Note}" Margin="10,4,10,0" Visibility="Collapsed"
+                           Text="Пока пусто. Архив начнёт записываться, когда ты выйдешь в эфир, а программа будет запущена."/>
+            </Grid>
+        </DockPanel>
+
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock x:Name="StreamTitle" Style="{StaticResource PageTitle}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="StreamSub" Foreground="{StaticResource MutedBrush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <DockPanel Grid.Row="1" Margin="0,12,0,10">
+                <Grid DockPanel.Dock="Right" Width="214" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <TextBox x:Name="SearchBox" AutomationProperties.Name="Поиск по архиву" TextChanged="OnSearchChanged"/>
+                    <TextBlock x:Name="SearchHint" Text="Поиск: ник или текст" Foreground="{StaticResource MutedBrush}" Margin="9,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False"/>
+                </Grid>
+                <WrapPanel x:Name="FilterPanel" VerticalAlignment="Center">
+                    <ToggleButton x:Name="MessagesFilter" Style="{StaticResource Chip}" Tag="#4C5468" Content="Сообщения" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                    <ToggleButton x:Name="DonationsFilter" Style="{StaticResource Chip}" Tag="#B07A14" Content="Донаты" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                    <ToggleButton x:Name="SubscriptionsFilter" Style="{StaticResource Chip}" Tag="#7A4FC4" Content="Подписки и Bits" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                    <ToggleButton x:Name="RewardsFilter" Style="{StaticResource Chip}" Tag="#2F6FC0" Content="Награды" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                    <ToggleButton x:Name="RaidsFilter" Style="{StaticResource Chip}" Tag="#2E8A55" Content="Рейды" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                    <ToggleButton x:Name="ClipsFilter" Style="{StaticResource Chip}" Tag="#B04A86" Content="Клипы" IsChecked="True" Margin="0,0,6,0" Click="OnFilterClick"/>
+                </WrapPanel>
+            </DockPanel>
+
+            <Border Grid.Row="2" Background="#20232B" BorderBrush="#333845" BorderThickness="1" CornerRadius="8">
+                <Grid>
+                    <ListBox x:Name="Timeline" Background="Transparent" BorderThickness="0" Padding="4,6" Foreground="{StaticResource TextBrush}"
+                             ItemContainerStyle="{StaticResource RowItem}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                             VirtualizingPanel.ScrollUnit="Pixel"
+                             AutomationProperties.Name="Сообщения и события">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <ui:ArchiveRowView Row="{Binding}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock x:Name="TimelineNote" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               TextAlignment="Center" TextWrapping="Wrap" Margin="24" Visibility="Collapsed"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

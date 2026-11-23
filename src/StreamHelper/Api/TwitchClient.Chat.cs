@@ -29,7 +29,13 @@ public interface IBadgeApi
 
 public sealed partial class TwitchClient
 {
-    public async Task<ChatSendResult> SendChatMessageAsync(string text, string? replyToMessageId, CancellationToken ct)
+    public Task<ChatSendResult> SendChatMessageAsync(string text, string? replyToMessageId, CancellationToken ct) =>
+        SendChatToAsync(Settings.ChannelId, text, replyToMessageId, ct);
+
+    public Task<ChatSendResult> SendOwnChatMessageAsync(string text, CancellationToken ct) =>
+        SendChatToAsync(Settings.TwitchUserId, text, null, ct);
+
+    private async Task<ChatSendResult> SendChatToAsync(string broadcasterId, string text, string? replyToMessageId, CancellationToken ct)
     {
         if (!Settings.HasChatWriteScope) return new ChatSendResult(false, "Чтобы писать в чат, переподключи Twitch в настройках, раздел «Подключения»: нужно новое право.");
         var message = text.Trim();
@@ -38,7 +44,7 @@ public sealed partial class TwitchClient
 
         var body = new Dictionary<string, object>
         {
-            ["broadcaster_id"] = Settings.ChannelId,
+            ["broadcaster_id"] = broadcasterId,
             ["sender_id"] = Settings.TwitchUserId,
             ["message"] = message,
         };

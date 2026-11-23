@@ -41,4 +41,10 @@ public sealed class ToastMerger
         var toast = _sink.Show(text(items));
         _open[typeof(T)] = (items.Cast<object>().ToList(), toast, now);
     }
+
+    public bool Refresh<T>(T item, Func<IReadOnlyList<T>, ToastText> text) where T : class
+    {
+        if (!_open.TryGetValue(typeof(T), out var open) || !open.Items.Contains(item)) return false;
+        return _sink.Update(open.Toast, text(open.Items.Cast<T>().ToList()));
+    }
 }

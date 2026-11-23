@@ -99,8 +99,10 @@ public class DaMediaFeedTests
         var talking = new Donation { Username = "viewer", Amount = 200, Currency = "RUB", Message = "смотри" };
         talking.AttachVideo("x", "Ролик", "https://www.youtube.com/watch?v=x");
 
-        Assert.Equal("▶ Ролик", EventToasts.Donations(new[] { silent }).Message);
-        Assert.Equal("смотри\n▶ Ролик", EventToasts.Donations(new[] { talking }).Message);
+        Assert.Null(EventToasts.Donations(new[] { silent }).Message);
+        Assert.Equal("Ролик", EventToasts.Donations(new[] { silent }).Caption);
+        Assert.Equal("https://i.ytimg.com/vi/x/mqdefault.jpg", EventToasts.Donations(new[] { silent }).Picture);
+        Assert.Equal("смотри", EventToasts.Donations(new[] { talking }).Message);
         Assert.Equal("viewer · 200 ₽", EventToasts.Donations(new[] { silent }).Line);
     }
 
@@ -212,6 +214,16 @@ public class DaMediaFeedTests
                 {
                     HttpListenerContext context;
                     try { context = await _server.GetContextAsync(); } catch { break; }
+                    if (!context.Request.IsWebSocketRequest && context.Request.Url!.AbsolutePath.StartsWith("/api/", StringComparison.Ordinal))
+                    {
+                        ApiAsked.Enqueue(context.Request.Url.PathAndQuery);
+                        var (status, body) = ApiAnswer(context.Request.Url.PathAndQuery);
+                        var bytes = Encoding.UTF8.GetBytes(body);
+                        context.Response.StatusCode = status;
+                        await context.Response.OutputStream.WriteAsync(bytes);
+                        context.Response.Close();
+                        continue;
+                    }
                     if (!context.Request.IsWebSocketRequest)
                     {
                         PageAsked.TrySetResult(context.Request.Url!.PathAndQuery);
@@ -239,7 +251,15 @@ public class DaMediaFeedTests
                 var first = await socket.ReceiveAsync(buffer, CancellationToken.None);
                 Joined.TrySetResult(Encoding.UTF8.GetString(buffer, 0, first.Count));
                 await afterJoin(socket);
-                while (socket.State == WebSocketState.Open) await socket.ReceiveAsync(buffer, CancellationToken.None);
+                while (socket.State == WebSocketState.Open)
+                {
+                    var frame = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                    if (frame.MessageType == WebSocketMessageType.Close) break;
+                    var text = Encoding.UTF8.GetString(buffer, 0, frame.Count);
+                    if (text == "2") continue;
+                    Received.Enqueue(text);
+                    if (OnFrame != null) await OnFrame(socket, text);
+                }
             }
             catch
             {
@@ -251,6 +271,14 @@ public class DaMediaFeedTests
         public TaskCompletionSource<string> PageAsked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource<string> Joined { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public System.Collections.Concurrent.ConcurrentQueue<string> ApiAsked { get; } = new();
+
+        public System.Collections.Concurrent.ConcurrentQueue<string> Received { get; } = new();
+
+        public Func<string, (int Status, string Body)> ApiAnswer { get; set; } = _ => (200, "({\"status\":\"success\",\"message\":\"\"})");
+
+        public Func<WebSocket, string, Task>? OnFrame { get; set; }
 
         public void Dispose() => _server.Stop();
     }

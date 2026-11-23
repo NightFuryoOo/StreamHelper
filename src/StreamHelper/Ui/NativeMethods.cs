@@ -138,6 +138,22 @@ internal static class NativeMethods
         }
     }
 
+    private const int DwmCornerPreference = 33;
+    private const int DwmRoundSmall = 3;
+
+    public static void RoundSmallCorners(IntPtr hwnd, int borderColor)
+    {
+        try
+        {
+            var round = DwmRoundSmall;
+            DwmSetWindowAttribute(hwnd, DwmCornerPreference, ref round, sizeof(int));
+            DwmSetWindowAttribute(hwnd, DwmBorderColor, ref borderColor, sizeof(int));
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
     public static void KeepOnTop(IntPtr hwnd) =>
         SetWindowPos(hwnd, HwndTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate | SwpShowWindow);
 

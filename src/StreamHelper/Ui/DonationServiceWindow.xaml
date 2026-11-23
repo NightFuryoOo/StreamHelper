@@ -48,7 +48,7 @@
         <StackPanel x:Name="VideoPanel" Margin="0,18,0,0" Visibility="Collapsed">
             <TextBlock Text="Заказанные видео" FontWeight="SemiBold"/>
             <TextBlock Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,3,0,0"
-                       Text="Необязательно. Вставь ссылку виджета DA, и в донатах будет видно, какое видео заказали. Где взять: «Виджеты» → «Оповещения» → «Показать ссылку для встраивания»."/>
+                       Text="Необязательно. Вставь ссылку виджета DA, и в донатах будет видно, какое видео заказали, а оповещения можно будет повторять и пропускать из программы. Где взять: «Виджеты» → «Оповещения» → «Показать ссылку для встраивания»."/>
             <DockPanel Margin="0,8,0,0">
                 <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Сохранить" Margin="8,0,0,0" Click="OnSaveVideoLink"/>
                 <PasswordBox x:Name="VideoLinkBox" AutomationProperties.Name="Ссылка виджета DA"/>

@@ -7,7 +7,7 @@ namespace StreamHelper.Storage;
 
 public sealed class SubscriberStore : EventStore<Subscriber>
 {
-    public SubscriberStore(string path) : base(path, nameof(Subscriber.Seen))
+    public SubscriberStore(string path) : base(path, nameof(Subscriber.Seen), nameof(Subscriber.DaAlertId), nameof(Subscriber.Recipients))
     {
         Load();
     }

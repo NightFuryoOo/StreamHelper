@@ -36,8 +36,33 @@ public class TypingHotkeyTests
 
         Assert.Equal(HotkeyAction.ChatInteract, ChatRules.KeyWhileTyping(settings, Key.NumPad3, ModifierKeys.None));
         Assert.Null(ChatRules.KeyWhileTyping(settings, Key.D3, ModifierKeys.None));
-        Assert.Null(ChatRules.KeyWhileTyping(settings, Key.NumPad2, ModifierKeys.None));
         Assert.Null(ChatRules.KeyWhileTyping(settings, Key.NumPad7, ModifierKeys.None));
+    }
+
+    [Fact]
+    public void The_show_hide_key_works_while_typing_instead_of_typing_its_digit()
+    {
+        var settings = new AppSettings();
+        settings.SetHotkey(HotkeyAction.ChatInteract, 0, 0x63);
+        settings.SetHotkey(HotkeyAction.ChatToggle, 0, 0x62);
+
+        Assert.Equal(HotkeyAction.ChatToggle, ChatRules.KeyWhileTyping(settings, Key.NumPad2, ModifierKeys.None));
+        Assert.Null(ChatRules.KeyWhileTyping(settings, Key.D2, ModifierKeys.None));
+        Assert.Null(ChatRules.KeyWhileTyping(settings, Key.NumPad2, ModifierKeys.Shift));
+    }
+
+    [Fact]
+    public void The_write_and_mouse_keys_win_over_show_hide_when_they_are_the_same()
+    {
+        var settings = new AppSettings();
+        settings.SetHotkey(HotkeyAction.ChatToggle, 0, 0x62);
+        settings.SetHotkey(HotkeyAction.ChatInteract, 0, 0x62);
+
+        Assert.Equal(HotkeyAction.ChatInteract, ChatRules.KeyWhileTyping(settings, Key.NumPad2, ModifierKeys.None));
+
+        settings.SetHotkey(HotkeyAction.ChatWrite, 0, 0x62);
+
+        Assert.Equal(HotkeyAction.ChatWrite, ChatRules.KeyWhileTyping(settings, Key.NumPad2, ModifierKeys.None));
     }
 
     [Fact]

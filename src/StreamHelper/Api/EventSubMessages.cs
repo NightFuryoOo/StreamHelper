@@ -18,7 +18,21 @@ public sealed record EventSubMessage(
     ChatMessage? Chat = null,
     ChannelMoment? Moment = null,
     ChatRemoval? Removal = null,
-    ChatModeration? Moderation = null);
+    ChatModeration? Moderation = null,
+    GiftNotice? Gift = null);
+
+public enum GiftNoticeKind
+{
+    Bundle,
+    Recipient,
+}
+
+public sealed record GiftNotice(
+    GiftNoticeKind Kind, string GifterLogin, string GifterName, bool Anonymous, string BundleId, int Total,
+    string RecipientLogin, string RecipientName, string Tier, DateTime AtUtc)
+{
+    public string RecipientLabel => RecipientName.Length > 0 ? RecipientName : RecipientLogin;
+}
 
 public sealed record ChatMention(string UserId, string Login, string Name);
 
@@ -106,18 +120,23 @@ public static class EventSubParser
             ChannelMoment? moment = null;
             ChatRemoval? removal = null;
             ChatModeration? moderation = null;
+            GiftNotice? gift = null;
             if (type == "notification" && payload.ValueKind == JsonValueKind.Object &&
                 payload.TryGetProperty("event", out var ev) && ev.ValueKind == JsonValueKind.Object)
             {
                 if (subscriptionType == RedemptionType) redemption = BuildRedemption(messageId, timestamp, ev);
                 else if (subscriptionType == ChatMessageType) chat = BuildChat(messageId, timestamp, ev);
-                else if (subscriptionType == ChatNoticeType) moment = BuildMoment(messageId, timestamp, ev);
+                else if (subscriptionType == ChatNoticeType)
+                {
+                    moment = BuildMoment(messageId, timestamp, ev);
+                    gift = BuildGift(timestamp, ev);
+                }
                 else if (subscriptionType is ChatDeleteType or ChatClearUserType or ChatClearType) removal = BuildRemoval(subscriptionType, ev);
                 else if (IsBanType(subscriptionType)) moderation = BuildModeration(subscriptionType, ev);
                 else subscriber = BuildSubscriber(subscriptionType, messageId, timestamp, ev);
             }
 
-            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment, removal, moderation);
+            return new EventSubMessage(type, messageId, sessionId, keepalive, reconnect, subscriptionType, subscriber, redemption, chat, moment, removal, moderation, gift);
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
@@ -241,6 +260,25 @@ public static class EventSubParser
         var seconds = (int)Math.Round((end - start).TotalSeconds);
         var minutes = (int)Math.Round(seconds / 60.0);
         return seconds >= 60 && Math.Abs(seconds - minutes * 60) <= 2 ? minutes * 60 : seconds;
+    }
+
+    private static GiftNotice? BuildGift(DateTime at, JsonElement ev)
+    {
+        var anonymous = ReadBool(ev, "chatter_is_anonymous");
+        var gifter = anonymous ? "" : ReadString(ev, "chatter_user_login");
+        var gifterName = anonymous ? "" : ReadString(ev, "chatter_user_name");
+        switch (ReadString(ev, "notice_type"))
+        {
+            case "community_sub_gift" when ev.TryGetProperty("community_sub_gift", out var bundle) && bundle.ValueKind == JsonValueKind.Object:
+                return new GiftNotice(GiftNoticeKind.Bundle, gifter, gifterName, anonymous, ReadString(bundle, "id"), ReadInt(bundle, "total"), "", "", ReadString(bundle, "sub_tier"), at);
+            case "sub_gift" when ev.TryGetProperty("sub_gift", out var single) && single.ValueKind == JsonValueKind.Object:
+                var login = ReadString(single, "recipient_user_login");
+                var name = ReadString(single, "recipient_user_name");
+                if (login.Length == 0 && name.Length == 0) return null;
+                return new GiftNotice(GiftNoticeKind.Recipient, gifter, gifterName, anonymous, ReadString(single, "community_gift_id"), 1, login, name, ReadString(single, "sub_tier"), at);
+            default:
+                return null;
+        }
     }
 
     private static ChannelMoment? BuildMoment(string messageId, DateTime at, JsonElement ev)

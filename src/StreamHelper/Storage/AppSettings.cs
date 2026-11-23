@@ -302,6 +302,24 @@ public sealed class AppSettings
 
     public int PollPointsPerVote { get; set; } = 100;
 
+    public List<string> RecentStreamTitles { get; set; } = new();
+
+    public bool ClipLinkToChat { get; set; }
+
+    public bool ArchiveEnabled { get; set; } = true;
+
+    public const int RecentStreamTitlesKept = 10;
+
+    public void RememberStreamTitle(string title)
+    {
+        var clean = title.Trim();
+        if (clean.Length == 0) return;
+        RecentStreamTitles ??= new List<string>();
+        RecentStreamTitles.RemoveAll(t => string.Equals(t, clean, StringComparison.Ordinal));
+        RecentStreamTitles.Insert(0, clean);
+        if (RecentStreamTitles.Count > RecentStreamTitlesKept) RecentStreamTitles.RemoveRange(RecentStreamTitlesKept, RecentStreamTitles.Count - RecentStreamTitlesKept);
+    }
+
     public double ToastOpacity { get; set; } = 1.0;
     public double ToastScale { get; set; } = 1.0;
     public double? ToastLeft { get; set; }
@@ -447,6 +465,12 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool HasBanEventsScope => HasScope("channel:moderate");
+
+    [JsonIgnore]
+    public bool HasBroadcastScope => HasScope("channel:manage:broadcast");
+
+    [JsonIgnore]
+    public bool HasClipsScope => HasScope("clips:edit");
 
     [JsonIgnore]
     public string RedirectUri => $"http://127.0.0.1:{RedirectPort}/callback";

@@ -297,7 +297,16 @@ public partial class ChatOverlayWindow
         var prediction = Item("Предикт…");
         prediction.Click += (_, _) => Dispatcher.InvokeAsync(() => OpenVoteDialog(VoteKind.Prediction));
         menu.Items.Add(prediction);
+        var title = Item("Название стрима…");
+        title.Click += (_, _) => Dispatcher.InvokeAsync(() =>
+        {
+            _idle.Stop();
+            StreamInfoRequested?.Invoke();
+        });
+        menu.Items.Add(title);
     }
+
+    public event Action? StreamInfoRequested;
 
     private void ShowChannelMenu()
     {

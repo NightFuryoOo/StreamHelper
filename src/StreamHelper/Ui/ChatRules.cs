@@ -13,7 +13,7 @@ public static class ChatRules
     public static bool IsHotkeyPress(HotkeyBinding binding, Key key, ModifierKeys modifiers) =>
         binding.IsSet && (uint)KeyInterop.VirtualKeyFromKey(key) == binding.VirtualKey && (uint)modifiers == binding.Modifiers;
 
-    public static readonly HotkeyAction[] KeysWhileTyping = { HotkeyAction.ChatWrite, HotkeyAction.ChatInteract };
+    public static readonly HotkeyAction[] KeysWhileTyping = { HotkeyAction.ChatWrite, HotkeyAction.ChatInteract, HotkeyAction.ChatToggle };
 
     public static HotkeyAction? KeyWhileTyping(AppSettings settings, Key key, ModifierKeys modifiers)
     {

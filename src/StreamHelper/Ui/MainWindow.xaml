@@ -176,6 +176,13 @@
                     <DockPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,10,0,0" LastChildFill="False">
                         <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Удалить"
                                 Foreground="{StaticResource DangerBrush}" Click="OnDeleteClick"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Повторить" Margin="0,0,2,0"
+                                ToolTip="Показать оповещение этого доната на стриме ещё раз" AutomationProperties.Name="Повторить оповещение на стриме"
+                                Visibility="{Binding CanRepeatAlert, Converter={StaticResource BoolVis}}" Click="OnRepeatAlertClick"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Пропустить" Margin="0,0,2,0"
+                                Foreground="{StaticResource WarnBrush}"
+                                ToolTip="Убрать со стрима оповещение этого доната, которое идёт прямо сейчас" AutomationProperties.Name="Пропустить оповещение на стриме"
+                                Visibility="{Binding AlertShowing, Converter={StaticResource BoolVis}}" Click="OnSkipAlertClick"/>
                         <ToggleButton DockPanel.Dock="Left" Style="{StaticResource Chip}" Content="✓ Посмотрел"
                                       Tag="#4C9AFF" IsChecked="{Binding Seen, Mode=TwoWay}"/>
                         <ToggleButton DockPanel.Dock="Left" Style="{StaticResource Chip}" Content="✓ Сделано"
@@ -401,12 +408,39 @@
                                Foreground="{StaticResource AccentBrush}" Margin="10,2,0,0"/>
                     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding SubText}" FontSize="11"
                                Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Message}" TextWrapping="Wrap"
-                               Foreground="{StaticResource TextBrush}" Margin="0,8,0,0"
-                               Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}"/>
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextBrush}" Margin="0,8,0,0"
+                                   Visibility="{Binding HasMessage, Converter={StaticResource BoolVis}}"/>
+                        <Button Style="{StaticResource FlatButton}" Content="{Binding RecipientsTitle}" HorizontalAlignment="Left" Margin="-6,6,0,0" Padding="6,2"
+                                ToolTip="Кому подарили подписки" AutomationProperties.Name="Кому подарили подписки"
+                                Visibility="{Binding HasRecipients, Converter={StaticResource BoolVis}}" Click="OnRecipientsToggle"/>
+                        <ItemsControl ItemsSource="{Binding RecipientNames}" Margin="0,4,0,0" Focusable="False"
+                                      Visibility="{Binding RecipientsOpen, Converter={StaticResource BoolVis}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#2E3440" CornerRadius="5" Padding="7,2" Margin="0,0,5,5">
+                                        <TextBox Style="{StaticResource Selectable}" Text="{Binding Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextBrush}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                     <DockPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,10,0,0" LastChildFill="False">
                         <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Удалить"
                                 Foreground="{StaticResource DangerBrush}" Click="OnDeleteSubscriberClick"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Повторить" Margin="0,0,2,0"
+                                ToolTip="Показать оповещение DA об этой подписке на стриме ещё раз" AutomationProperties.Name="Повторить оповещение на стриме"
+                                Visibility="{Binding CanRepeatAlert, Converter={StaticResource BoolVis}}" Click="OnRepeatAlertClick"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource FlatButton}" Content="Пропустить" Margin="0,0,2,0"
+                                Foreground="{StaticResource WarnBrush}"
+                                ToolTip="Убрать со стрима оповещение DA об этой подписке, которое идёт прямо сейчас" AutomationProperties.Name="Пропустить оповещение на стриме"
+                                Visibility="{Binding AlertShowing, Converter={StaticResource BoolVis}}" Click="OnSkipAlertClick"/>
                         <ToggleButton DockPanel.Dock="Left" Style="{StaticResource Chip}" Content="✓ Посмотрел"
                                       Tag="#4C9AFF" IsChecked="{Binding Seen, Mode=TwoWay}"/>
                     </DockPanel>

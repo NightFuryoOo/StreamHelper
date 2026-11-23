@@ -123,6 +123,25 @@ public sealed class Donation : StreamHelper.Storage.ISeenItem, StreamHelper.Stor
 
     [JsonIgnore] public string SourceName => string.IsNullOrEmpty(Source) ? DonationSources.DonationAlerts : Source;
 
+    [JsonIgnore] public bool IsDonationAlerts => string.IsNullOrEmpty(Source);
+
+    private bool _alertShowing;
+
+    [JsonIgnore]
+    public bool AlertShowing
+    {
+        get => _alertShowing;
+        set
+        {
+            if (_alertShowing == value) return;
+            _alertShowing = value;
+            Raise();
+            Raise(nameof(CanRepeatAlert));
+        }
+    }
+
+    [JsonIgnore] public bool CanRepeatAlert => IsDonationAlerts && !_alertShowing;
+
     [JsonIgnore]
     public string Key => string.IsNullOrEmpty(Source)
         ? Id.ToString(CultureInfo.InvariantCulture)

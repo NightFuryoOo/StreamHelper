@@ -66,6 +66,8 @@ public sealed class ChatOverlayService : IPositionable
 
     public event Action<bool>? TypingChanged;
 
+    public event Action? StreamInfoRequested;
+
     public void BeginTyping()
     {
         if (_positioning || _settings.Current.ChatHidden || _window is not { IsVisible: true, IsFadingOut: false }) return;
@@ -116,6 +118,12 @@ public sealed class ChatOverlayService : IPositionable
         settings.ChatHidden = !settings.ChatHidden;
         _settings.Save();
         Apply();
+    }
+
+    public void HideChat()
+    {
+        if (_positioning || _settings.Current.ChatHidden) return;
+        ToggleVisible();
     }
 
     public void ToggleInteractive()
@@ -196,6 +204,8 @@ public sealed class ChatOverlayService : IPositionable
         window.MessageDeleted += OnChatMessageDeleted;
         window.Moderated += _feed.Moderate;
         window.PinChanged += _pins.Show;
+        window.StreamInfoRequested += () => StreamInfoRequested?.Invoke();
+        window.HideRequested += HideChat;
         _window = window;
         foreach (var message in _feed.Recent())
         {
@@ -228,6 +238,26 @@ public sealed class ChatOverlayService : IPositionable
             Log.Write("Stream start failed: " + ex.Message);
         }
 
+        ShowHistory(() => new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel,
+            _previews, () => _settings.Current.ChatLinkPreviews, _settings.Current.IsOwnChannel ? Archive : null));
+    }
+
+    public ChatArchive? Archive { get; set; }
+
+    public ChatEmotes Emotes => _emotes;
+
+    public ChatHistoryWindow? History => _history;
+
+    public void OpenArchivedHistory(ChatMessage message, ArchiveStream stream)
+    {
+        if (Archive == null) return;
+        _ = _emotes.EnsureCatalogAsync();
+        ShowHistory(() => new ChatHistoryWindow(_feed, message, null, _emotes, _moderation, false,
+            _previews, () => _settings.Current.ChatLinkPreviews, Archive, stream));
+    }
+
+    private void ShowHistory(Func<ChatHistoryWindow> create)
+    {
         try
         {
             if (_history == null) _historyReturnTo = NativeMethods.GetForegroundWindow();
@@ -238,8 +268,7 @@ public sealed class ChatOverlayService : IPositionable
                 old.Closed -= OnHistoryClosed;
                 old.Close();
             }
-            var window = new ChatHistoryWindow(_feed, message, since, _emotes, _moderation, !_settings.Current.IsViewerChannel,
-                _previews, () => _settings.Current.ChatLinkPreviews);
+            var window = create();
             window.Closed += OnHistoryClosed;
             _history = window;
             window.Show();

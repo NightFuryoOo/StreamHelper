@@ -29,7 +29,7 @@ public class EventToastTests
 
         Assert.Equal("Новых донатов: 2", text.Title);
         Assert.Equal($"Марк · {newest.AmountText}", text.Line);
-        Assert.Equal("", text.Message);
+        Assert.True(string.IsNullOrEmpty(text.Message));
     }
 
     [Fact]

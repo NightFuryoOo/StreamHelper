@@ -241,7 +241,10 @@
 
         <ControlTemplate x:Key="VerticalScrollBarTemplate" TargetType="ScrollBar">
             <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track x:Name="PART_Track" IsDirectionReversed="True" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                    <Track.Resources>
+                        <sys:Double x:Key="{x:Static SystemParameters.VerticalScrollBarButtonHeightKey}">56</sys:Double>
+                    </Track.Resources>
                     <Track.DecreaseRepeatButton>
                         <RepeatButton Style="{StaticResource TrackPageButton}" Command="ScrollBar.PageUpCommand"/>
                     </Track.DecreaseRepeatButton>
@@ -257,7 +260,10 @@
 
         <ControlTemplate x:Key="HorizontalScrollBarTemplate" TargetType="ScrollBar">
             <Border Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-                <Track x:Name="PART_Track">
+                <Track x:Name="PART_Track" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                    <Track.Resources>
+                        <sys:Double x:Key="{x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}">56</sys:Double>
+                    </Track.Resources>
                     <Track.DecreaseRepeatButton>
                         <RepeatButton Style="{StaticResource TrackPageButton}" Command="ScrollBar.PageLeftCommand"/>
                     </Track.DecreaseRepeatButton>

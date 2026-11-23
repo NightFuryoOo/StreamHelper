@@ -23,6 +23,8 @@ public partial class ChatOverlayWindow
 
     public event Action<bool>? TypingChanged;
 
+    public event Action? HideRequested;
+
     public bool IsTyping => _typing;
 
     private void InitCompose(IChatSendApi chatSend)
@@ -187,6 +189,12 @@ public partial class ChatOverlayWindow
             _dropText = true;
             if (e.IsRepeat) return;
             HideMentions();
+            if (action == HotkeyAction.ChatToggle)
+            {
+                EndTyping(returnFocus: true);
+                HideRequested?.Invoke();
+                return;
+            }
             var mouse = action == HotkeyAction.ChatInteract;
             if (!mouse || _interactive) EndTyping(returnFocus: true);
             if (mouse) SetInteractive(!_interactive);

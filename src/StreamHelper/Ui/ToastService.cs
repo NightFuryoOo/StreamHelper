@@ -20,7 +20,7 @@ public sealed class ToastService : IPositionable, IToastSink
 
     public int Count => _toasts.Count;
 
-    public ToastWindow Show(string title, string line, string? message)
+    public ToastWindow Show(string title, string line, string? message, string? picture = null, string? caption = null)
     {
         while (_toasts.Count >= ToastStack.MaxToasts)
         {
@@ -28,7 +28,7 @@ public sealed class ToastService : IPositionable, IToastSink
             _toasts.RemoveAt(0);
             oldest.CloseNow();
         }
-        var toast = new ToastWindow(_settings.Current, title, line, message) { Stacked = true };
+        var toast = new ToastWindow(_settings.Current, title, line, message, picture: picture, caption: caption) { Stacked = true };
         toast.Closed += (_, _) =>
         {
             if (_toasts.Remove(toast)) Relayout();
@@ -38,12 +38,12 @@ public sealed class ToastService : IPositionable, IToastSink
         return toast;
     }
 
-    public object Show(ToastText text) => Show(text.Title, text.Line, text.Message);
+    public object Show(ToastText text) => Show(text.Title, text.Line, text.Message, text.Picture, text.Caption);
 
     public bool Update(object toast, ToastText text)
     {
         if (toast is not ToastWindow window || !_toasts.Contains(window) || window.IsClosing) return false;
-        window.Refresh(text.Title, text.Line, text.Message);
+        window.Refresh(text.Title, text.Line, text.Message, text.Picture, text.Caption);
         Relayout();
         return true;
     }

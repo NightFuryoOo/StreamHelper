@@ -38,11 +38,12 @@ public sealed class PingListener : EventSubListener<ChatPing>
     private readonly Action<ChannelMoment>? _onMoment;
     private readonly Action<ChatRemoval>? _onRemoval;
     private readonly Action<ChatModeration>? _onModeration;
+    private readonly Action<GiftNotice>? _onGift;
 
     public PingListener(
         SettingsStore settings, IEventSubApi api, string url, Func<IReadOnlyList<ChatPing>, Task> deliver,
         Action<ChatMessage>? onChat = null, Action<ChannelMoment>? onMoment = null, Action<ChatRemoval>? onRemoval = null,
-        Action<ChatModeration>? onModeration = null)
+        Action<ChatModeration>? onModeration = null, Action<GiftNotice>? onGift = null)
         : base(settings, api, url, Feature, deliver)
     {
         _settings = settings;
@@ -50,6 +51,7 @@ public sealed class PingListener : EventSubListener<ChatPing>
         _onMoment = onMoment;
         _onRemoval = onRemoval;
         _onModeration = onModeration;
+        _onGift = onGift;
     }
 
     public static SyncStatus TabStatus(SyncStatus status, AppSettings settings) =>
@@ -78,6 +80,19 @@ public sealed class PingListener : EventSubListener<ChatPing>
             catch (Exception ex)
             {
                 Log.Write("Chat moderation delivery failed: " + ex.Message);
+            }
+            return null;
+        }
+        if (message.Gift is { } gift)
+        {
+            if (!_settings.Current.IsOwnChannel) return null;
+            try
+            {
+                _onGift?.Invoke(gift);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Gift recipients delivery failed: " + ex.Message);
             }
             return null;
         }

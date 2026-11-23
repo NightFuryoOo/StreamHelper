@@ -12,6 +12,16 @@ namespace StreamHelper.Sync;
 
 public sealed record EventSubOptionalType(string Type, string Scope, bool NotAsViewer = false);
 
+public static class EventSubRefusal
+{
+    public const string NotOwnChannelBans =
+        "Twitch отдаёт баны и муты только владельцу канала, поэтому подписи «кто забанил / замутил» работают только на своём канале. Переподключать Twitch не нужно.";
+
+    public static string Optional(string label, string type, bool ownChannel, Exception ex) =>
+        $"Twitch EventSub ({label}): {type} is not available: " +
+        (ex is AuthRequiredException && !ownChannel && EventSubParser.IsBanType(type) ? NotOwnChannelBans : ex.Message);
+}
+
 public sealed record EventSubFeature(
     string Label, string RequiredScope, IReadOnlyList<string> Types, string MissingScopeMessage, bool FollowsChannel = false,
     IReadOnlyList<EventSubOptionalType>? OptionalTypes = null);
@@ -228,7 +238,7 @@ public abstract class EventSubListener<T> : ISyncWorker where T : class
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                Log.Write($"Twitch EventSub ({_feature.Label}): {optional.Type} is not available: " + ex.Message);
+                Log.Write(EventSubRefusal.Optional(_feature.Label, optional.Type, settings.IsOwnChannel, ex));
             }
         }
     }

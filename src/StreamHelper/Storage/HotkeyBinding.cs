@@ -17,6 +17,9 @@ public enum HotkeyAction
     RewardSoundsMute,
     Moments,
     ChatWrite,
+    DaSkipAlert,
+    Clip,
+    DaPauseSubs,
 }
 
 public sealed class HotkeyBinding
@@ -53,6 +56,9 @@ public static class HotkeyActions
         HotkeyAction.RewardSoundsMute => "Звуки наград: выкл / вкл",
         HotkeyAction.Moments => "Рейды и стрики",
         HotkeyAction.ChatWrite => "Чат: написать сообщение",
+        HotkeyAction.DaSkipAlert => "DA: пропустить оповещение",
+        HotkeyAction.Clip => "Сделать клип",
+        HotkeyAction.DaPauseSubs => "DA: пауза подписок",
         _ => action.ToString(),
     };
 

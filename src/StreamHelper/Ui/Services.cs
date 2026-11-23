@@ -12,6 +12,47 @@ public sealed class Services
 {
     private SettingsWindow? _settingsWindow;
     private HelpWindow? _helpWindow;
+    private StreamInfoWindow? _streamInfoWindow;
+    private ArchiveWindow? _archiveWindow;
+    private ClipMaker? _clips;
+
+    public ClipMaker Clips => _clips ??= new ClipMaker(Twitch, linkToChat: () => Settings.Current.ClipLinkToChat);
+
+    public void OpenArchive()
+    {
+        if (_archiveWindow is { IsLoaded: true })
+        {
+            if (_archiveWindow.WindowState == WindowState.Minimized) _archiveWindow.WindowState = WindowState.Normal;
+            _archiveWindow.Activate();
+            NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_archiveWindow).Handle);
+            return;
+        }
+        var window = new ArchiveWindow(Archive.Archive, Chat.Emotes, Chat.OpenArchivedHistory);
+        window.Closed += (_, _) => _archiveWindow = null;
+        _archiveWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
+    public void OpenStreamInfo(bool returnFocus = false)
+    {
+        if (_streamInfoWindow is { IsLoaded: true })
+        {
+            _streamInfoWindow.Activate();
+            NativeMethods.BringToFront(new System.Windows.Interop.WindowInteropHelper(_streamInfoWindow).Handle);
+            return;
+        }
+        var previous = returnFocus ? NativeMethods.GetForegroundWindow() : IntPtr.Zero;
+        var window = new StreamInfoWindow(Twitch, Settings);
+        window.Closed += (_, _) =>
+        {
+            _streamInfoWindow = null;
+            if (window.SavedTitle is { } title) Toasts.Show("Название стрима сохранено", title, null);
+            if (previous != IntPtr.Zero && NativeMethods.Exists(previous)) NativeMethods.SetForegroundWindow(previous);
+        };
+        _streamInfoWindow = window;
+        window.Show();
+    }
 
     public required SettingsStore Settings { get; init; }
     public required DonationStore Donations { get; init; }
@@ -32,6 +73,7 @@ public sealed class Services
     public required MainViewModel ViewModel { get; init; }
     public required UpdateService Updates { get; init; }
     public required VoteWatcher Votes { get; init; }
+    public required ArchiveRecorder Archive { get; init; }
     public required RewardMuteSwitch RewardMute { get; init; }
     public LinkPreviewCatalog? Previews { get; init; }
 
@@ -39,6 +81,7 @@ public sealed class Services
     public DonatePayPoller DonatePayPoller { get; set; } = null!;
     public DonateXPoller DonateXPoller { get; set; } = null!;
     public DaMediaFeed DaMedia { get; set; } = null!;
+    public DaAlertPause DaPause { get; set; } = null!;
     public DonationStatusHub DonationStatus { get; set; } = null!;
     public FollowerPoller FollowerPoller { get; set; } = null!;
     public SubscriptionListener SubscriptionListener { get; set; } = null!;
@@ -248,6 +291,7 @@ public sealed class Services
         RewardListener.Restart();
         PingListener.Restart();
         Votes.PollSoon();
+        Archive.CheckSoon();
         _ = RewardMute.SyncAsync();
     }
 

@@ -149,6 +149,11 @@ public sealed class ChatFeed
         }
     }
 
+    public IReadOnlyList<ChatMessage> Since(DateTime sinceUtc)
+    {
+        lock (_gate) return _history.Where(m => m.AtUtc >= sinceUtc).ToList();
+    }
+
     public IReadOnlyList<ChatMessage> HistoryOf(string chatterKey, DateTime? sinceUtc = null)
     {
         lock (_gate)

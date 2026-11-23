@@ -28,6 +28,8 @@ public partial class App : Application
     private string[] _args = Array.Empty<string>();
     private readonly string? _exePath = Environment.ProcessPath;
     private readonly Dictionary<long, (DonationVideo Video, DateTime AtUtc)> _waitingVideos = new();
+    private readonly List<(DaAlertEvent Alert, DateTime AtUtc)> _waitingAlerts = new();
+    private readonly GiftRecipientBook _gifts = new();
 
     private const string RestartFlag = "--restarted";
     private static readonly TimeSpan WaitingVideoLife = TimeSpan.FromMinutes(30);
@@ -71,6 +73,7 @@ public partial class App : Application
 
         services.Hotkey.Pressed += action => Dispatcher.InvokeAsync(() => OnHotkey(services, action));
         services.Hotkey.RewardPressed += rewardId => Dispatcher.InvokeAsync(() => services.RewardAlert.PlayByHotkey(rewardId));
+        services.Chat.StreamInfoRequested += () => services.OpenStreamInfo(returnFocus: true);
         services.Chat.TypingChanged += typing =>
         {
             if (typing)
@@ -97,6 +100,7 @@ public partial class App : Application
         });
 
         foreach (var worker in services.Workers) worker.Start();
+        services.Archive.Start();
         services.Chat.Apply();
         services.RewardAlert.MutedChanged += _ => services.MuteBadge.Apply(services.RewardAlert.Muted);
         services.RewardAlert.MutedChanged += muted => _ = services.RewardMute.SyncAsync();
@@ -118,6 +122,7 @@ public partial class App : Application
             else services.Toasts.Show("StreamHelper обновлён", "Версия " + AppVersion.Current, null);
         }
         services.Updates.Start();
+        if (services.DaPause.StartupNotice is { } paused) services.Toasts.Show(DonationSources.DonationAlerts, paused, null);
 
         if (showAtStart) services.Overlay.ShowOverlay();
         if (imported != null) services.ProfileNotice = ProfileTexts.Imported(imported, settings.Current);
@@ -180,6 +185,7 @@ public partial class App : Application
         var emotes = new ChatEmotes(extraEmotes, images, twitchEndpoints, new EmoteLibrary(twitch, extraEmotes, settings, twitchEndpoints),
             ChatEmotes.GifCache(_http), () => settings.Current.ChatGifs);
         var votes = new VoteWatcher(settings, twitch);
+        var archive = new ArchiveRecorder(ChatArchive.InDataFolder(AppPaths.Directory), twitch, settings, chatFeed, donations, subscribers, redemptions, moments, clips: twitch);
 
         var services = new Services
         {
@@ -198,6 +204,7 @@ public partial class App : Application
             ChatFeed = chatFeed,
             Chat = new ChatOverlayService(settings, chatFeed, new ChatBadgeCatalog(twitch), twitch, twitch, emotes, twitch, votes, twitch, twitch, twitch, previews),
             Votes = votes,
+            Archive = archive,
             RewardAlert = new RewardAlertService(settings),
             RewardMute = new RewardMuteSwitch(settings, twitch),
             MuteBadge = new MuteBadgeService(settings),
@@ -208,6 +215,7 @@ public partial class App : Application
                 UpdateInstaller.IsInstallable(_exePath, AppContext.BaseDirectory, "StreamHelper"), AppPaths.Directory, Restart),
         };
         services.Overlay = new MainWindow(services);
+        services.Chat.Archive = archive.Archive;
         services.HandleDonations = OnDonations;
         services.HandleFollowers = OnFollowers;
         services.HandleSubscribers = OnSubscribers;
@@ -232,6 +240,10 @@ public partial class App : Application
             settings, new DonateXClient(settings, _http!, Environment.GetEnvironmentVariable("STREAMHELPER_DONATEX_URL")), OnUi<Donation>(OnDonations));
         services.DaMedia = new DaMediaFeed(_http!, () => settings.Current.DaWidgetLink, Environment.GetEnvironmentVariable("STREAMHELPER_DA_WIDGET_URL"));
         services.DaMedia.VideoFound += (id, video) => Dispatcher.InvokeAsync(() => AttachVideo(id, video));
+        services.DaMedia.AlertChanged += () => Dispatcher.InvokeAsync(() => MarkShowingAlert(services));
+        services.DaMedia.AlertSeen += alert => Dispatcher.InvokeAsync(() => AttachDaAlert(services, alert));
+        services.DaPause = new DaAlertPause(services.DaMedia, System.IO.Path.Combine(AppPaths.Directory, DaAlertPause.FileName));
+        services.DaPause.Failed += message => Dispatcher.InvokeAsync(() => services.Toasts.Show(DonationSources.DonationAlerts, message, null));
         if (Environment.GetEnvironmentVariable("STREAMHELPER_YTIMG_URL") is { Length: > 0 } images) YouTubeImages.Base = images;
         services.DonationStatus = new DonationStatusHub(
             (DonationSources.DonationAlerts, services.Poller), (DonationSources.DonatePay, services.DonatePayPoller),
@@ -249,7 +261,8 @@ public partial class App : Application
         Track(services.RewardListener, viewModel.ApplyRewardStatus);
         services.PingListener = new PingListener(
             settings, twitch, eventSubUrl, OnUi<ChatPing>(OnPings), services.ChatFeed.Push,
-            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })), services.ChatFeed.Remove, services.ChatFeed.Moderate);
+            moment => Dispatcher.InvokeAsync(() => OnMoments(new[] { moment })), services.ChatFeed.Remove, services.ChatFeed.Moderate,
+            gift => Dispatcher.InvokeAsync(() => _gifts.Add(services.Subscribers.Items, gift, DateTime.UtcNow)));
         Track(services.PingListener, status => viewModel.ApplyPingStatus(PingListener.TabStatus(status, settings.Current)));
         Track(services.PingListener, status => viewModel.ApplyMomentStatus(PingListener.TabStatus(status, settings.Current)));
     }
@@ -260,6 +273,10 @@ public partial class App : Application
         var tray = new TrayIcon(
             () => services.Overlay.Toggle(),
             () => services.Chat.ToggleVisible(),
+            () => services.OpenStreamInfo(),
+            services.OpenArchive,
+            () => services.DaPause.MenuText,
+            () => PauseSubs(services),
             services.OpenSettings,
             () => services.OpenHelp(),
             () =>
@@ -331,6 +348,68 @@ public partial class App : Application
         else if (action == HotkeyAction.ChatToggle) services.Chat.ToggleVisible();
         else if (action == HotkeyAction.ChatWrite) services.Chat.BeginTyping();
         else if (action == HotkeyAction.RewardSoundsMute) services.RewardAlert.ToggleMuted();
+        else if (action == HotkeyAction.DaSkipAlert) _ = SkipAlertByKeyAsync(services);
+        else if (action == HotkeyAction.Clip) _ = MakeClipAsync(services);
+        else if (action == HotkeyAction.DaPauseSubs) PauseSubs(services);
+    }
+
+    private static void PauseSubs(Services services)
+    {
+        var result = services.DaPause.Toggle();
+        services.Toasts.Show(DonationSources.DonationAlerts, result.Message, null);
+    }
+
+    private static async Task MakeClipAsync(Services services)
+    {
+        object? toast = null;
+        var outcome = await services.Clips.MakeAsync(started => toast = services.Toasts.Show(new ToastText(started.Title, started.Line, null)));
+        if (outcome.Clip is { } made) services.Archive.AddClip(made);
+        var text = new ToastText(outcome.Title, outcome.Line, null, outcome.Picture, outcome.Caption);
+        if (toast == null || !services.Toasts.Update(toast, text)) services.Toasts.Show(text);
+    }
+
+    private static async Task SkipAlertByKeyAsync(Services services)
+    {
+        var result = await services.DaMedia.SkipCurrentAsync();
+        services.Toasts.Show(DonationSources.DonationAlerts, result.Message, null);
+    }
+
+    private static void MarkShowingAlert(Services services)
+    {
+        foreach (var donation in services.Donations.Items)
+        {
+            donation.AlertShowing = donation.IsDonationAlerts && services.DaMedia.IsShowing(donation.Id);
+        }
+        foreach (var subscriber in services.Subscribers.Items)
+        {
+            subscriber.AlertShowing = subscriber.DaAlertId is { } id && services.DaMedia.IsShowing(id, subscriber.DaAlertType ?? "");
+        }
+    }
+
+    private void AttachDaAlert(Services services, DaAlertEvent alert)
+    {
+        if (!DaAlertMatch.Handles(alert)) return;
+        if (DaAlertMatch.Find(services.Subscribers.Items, alert) is { } subscriber)
+        {
+            subscriber.AttachDaAlert(alert.Id, alert.Type);
+            MarkShowingAlert(services);
+            return;
+        }
+        var now = DateTime.UtcNow;
+        _waitingAlerts.RemoveAll(waiting => now - waiting.AtUtc > WaitingVideoLife || waiting.Alert.Id == alert.Id && waiting.Alert.Type == alert.Type);
+        _waitingAlerts.Add((alert, now));
+    }
+
+    private void AttachWaitingAlerts(Services services)
+    {
+        if (_waitingAlerts.Count == 0) return;
+        foreach (var waiting in _waitingAlerts.ToList())
+        {
+            if (DaAlertMatch.Find(services.Subscribers.Items, waiting.Alert) is not { } subscriber) continue;
+            subscriber.AttachDaAlert(waiting.Alert.Id, waiting.Alert.Type);
+            _waitingAlerts.Remove(waiting);
+        }
+        MarkShowingAlert(services);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -338,6 +417,8 @@ public partial class App : Application
         if (_services != null)
         {
             foreach (var worker in _services.Workers) worker.Stop();
+            _services.Archive.Stop();
+            _services.Archive.Archive.Dispose();
         }
         _fullscreen?.Stop();
         _services?.Hotkey.Dispose();
@@ -388,6 +469,7 @@ public partial class App : Application
         foreach (var item in items)
         {
             if (item.Source.Length == 0 && _waitingVideos.Remove(item.Id, out var waiting)) Attach(item, waiting.Video);
+            if (item.IsDonationAlerts && _services?.DaMedia is { } feed) item.AlertShowing = feed.IsShowing(item.Id);
         }
         Deliver(s => s.Donations, items, _ => true, EventToasts.Donations);
     }
@@ -399,7 +481,9 @@ public partial class App : Application
         var donation = services.Donations.Items.FirstOrDefault(d => d.Source.Length == 0 && d.Id == donationId);
         if (donation != null)
         {
+            var had = donation.HasVideo;
             Attach(donation, video);
+            if (!had) ShowLateVideo(services, donation);
             return;
         }
         var now = DateTime.UtcNow;
@@ -409,11 +493,25 @@ public partial class App : Application
 
     private static void Attach(Donation donation, DonationVideo video) => donation.AttachVideo(video.VideoId, video.Title, video.Url);
 
+    private void ShowLateVideo(Services services, Donation donation)
+    {
+        var settings = services.Settings.Current;
+        if (!settings.ShowToast || services.Overlay.IsOpen) return;
+        if (_toastMerger?.Refresh(donation, EventToasts.Donations) == true) return;
+        if (donation.CreatedAtUtc != default && DateTime.UtcNow - donation.CreatedAtUtc > WaitingVideoLife) return;
+        services.Toasts.Show(EventToasts.LateVideo(donation));
+    }
+
     private void OnFollowers(IReadOnlyList<Follower> items) =>
         Deliver(s => s.Followers, items, s => s.NotifyFollowers, EventToasts.Followers);
 
-    private void OnSubscribers(IReadOnlyList<Subscriber> items) =>
+    private void OnSubscribers(IReadOnlyList<Subscriber> items)
+    {
         Deliver(s => s.Subscribers, items, EventToasts.Notifies, EventToasts.Subscribers);
+        if (_services == null) return;
+        AttachWaitingAlerts(_services);
+        _gifts.Retry(_services.Subscribers.Items, DateTime.UtcNow);
+    }
 
     private void OnPings(IReadOnlyList<ChatPing> items) =>
         Deliver(s => s.Pings, items, s => s.NotifyPings, EventToasts.Pings);

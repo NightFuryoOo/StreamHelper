@@ -218,6 +218,48 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(url)) BrowserLauncher.Open(url);
     }
 
+    private void OnRecipientsToggle(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is Subscriber subscriber) subscriber.RecipientsOpen = !subscriber.RecipientsOpen;
+    }
+
+    private static (long Id, string Type, string Name)? AlertOf(object? item) => item switch
+    {
+        Donation { IsDonationAlerts: true } donation => (donation.Id, Sync.DaMediaFeed.DonationAlertType, $"{donation.DisplayName} · {donation.AmountText}"),
+        Subscriber { DaAlertId: { } id } subscriber => (id, subscriber.DaAlertType ?? Sync.DaMediaFeed.SubAlertType, $"{subscriber.Name} · {subscriber.KindText}"),
+        _ => null,
+    };
+
+    private async void OnRepeatAlertClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button || AlertOf(button.DataContext) is not { } alert) return;
+        button.IsEnabled = false;
+        try
+        {
+            var result = await _services.DaMedia.RepeatAsync(alert.Id, alert.Type);
+            _services.ViewModel.ShowNotice(result.Success ? $"{result.Message} {alert.Name}" : result.Message);
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    private async void OnSkipAlertClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button button || AlertOf(button.DataContext) is not { } alert) return;
+        button.IsEnabled = false;
+        try
+        {
+            var result = await _services.DaMedia.SkipAsync(alert.Id, alert.Type);
+            _services.ViewModel.ShowNotice(result.Message);
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
     private void OnDeleteClick(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is not Donation donation) return;

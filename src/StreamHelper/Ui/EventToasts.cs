@@ -5,18 +5,26 @@ using StreamHelper.Storage;
 
 namespace StreamHelper.Ui;
 
-public sealed record ToastText(string Title, string Line, string? Message);
+public sealed record ToastText(string Title, string Line, string? Message, string? Picture = null, string? Caption = null);
 
 public static class EventToasts
 {
     public static ToastText Donations(IReadOnlyList<Donation> added)
     {
         var newest = added[^1];
-        var video = newest.HasVideo ? "▶ " + newest.VideoTitle : null;
-        var message = video == null ? newest.Message : newest.HasMessage ? newest.Message + "\n" + video : video;
-        return new ToastText(
-            added.Count == 1 ? "Новый донат" : $"Новых донатов: {added.Count}",
-            $"{newest.Username} · {newest.AmountText}", message);
+        return WithVideo(added.Count == 1 ? "Новый донат" : $"Новых донатов: {added.Count}", newest);
+    }
+
+    public static ToastText LateVideo(Donation donation) => WithVideo("Видео к донату", donation);
+
+    private static ToastText WithVideo(string title, Donation donation)
+    {
+        var line = $"{donation.Username} · {donation.AmountText}";
+        var message = donation.HasMessage ? donation.Message : null;
+        if (!donation.HasVideo) return new ToastText(title, line, message);
+        if (donation.VideoThumbnail is { } picture) return new ToastText(title, line, message, picture, donation.VideoTitle);
+        var video = "▶ " + donation.VideoTitle;
+        return new ToastText(title, line, message == null ? video : message + "\n" + video);
     }
 
     public static ToastText Followers(IReadOnlyList<Follower> added) =>

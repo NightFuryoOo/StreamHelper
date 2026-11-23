@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using StreamHelper.Storage;
@@ -27,7 +28,7 @@ public partial class ToastWindow : Window
     private Point _resizeStartCursor;
     private Rect _resizeStartRect;
 
-    public ToastWindow(AppSettings settings, string title, string line, string? message, bool positioning = false)
+    public ToastWindow(AppSettings settings, string title, string line, string? message, bool positioning = false, string? picture = null, string? caption = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -36,6 +37,7 @@ public partial class ToastWindow : Window
         LineText.Text = line;
         if (string.IsNullOrWhiteSpace(message)) MessageText.Visibility = Visibility.Collapsed;
         else MessageText.Text = message;
+        ShowPicture(picture, caption);
         _timer.Tick += (_, _) => Dismiss();
         ApplyAppearance();
 
@@ -136,7 +138,41 @@ public partial class ToastWindow : Window
 
     public bool IsClosing => _closing || _closed;
 
-    public void Refresh(string title, string line, string? message)
+    private string? _picture;
+
+    public string? Picture => _picture;
+
+    private void ShowPicture(string? url, string? caption)
+    {
+        VideoCaption.Text = caption ?? "";
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            _picture = null;
+            VideoImage.Source = null;
+            VideoRow.Visibility = Visibility.Collapsed;
+            return;
+        }
+        VideoRow.Visibility = Visibility.Visible;
+        if (_picture == url) return;
+        _picture = url;
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = uri;
+            image.DecodePixelWidth = 240;
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.EndInit();
+            if (image.IsDownloading) image.DownloadFailed += (_, _) => VideoImage.Source = null;
+            VideoImage.Source = image;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or System.IO.IOException or InvalidOperationException)
+        {
+            VideoImage.Source = null;
+        }
+    }
+
+    public void Refresh(string title, string line, string? message, string? picture = null, string? caption = null)
     {
         TitleText.Text = title;
         LineText.Text = line;
@@ -146,6 +182,7 @@ public partial class ToastWindow : Window
             MessageText.Text = message;
             MessageText.Visibility = Visibility.Visible;
         }
+        ShowPicture(picture, caption);
         if (_positioning) return;
         _timer.Stop();
         _timer.Start();

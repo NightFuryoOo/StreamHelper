@@ -65,7 +65,7 @@ public class BanEventTests
     [Fact]
     public void Ban_events_need_the_new_right_and_are_not_asked_for_as_a_viewer()
     {
-        Assert.EndsWith(" channel:moderate", TwitchClient.Scopes);
+        Assert.Contains(" channel:moderate ", TwitchClient.Scopes + " ");
         Assert.True(new AppSettings { TwitchScopes = TwitchClient.Scopes }.HasBanEventsScope);
         Assert.False(new AppSettings { TwitchScopes = "user:read:chat moderator:manage:banned_users" }.HasBanEventsScope);
         foreach (var type in new[] { EventSubParser.BanType, EventSubParser.UnbanType })
@@ -287,5 +287,28 @@ public class BanLabelTextTests
         Assert.Null(ChatModerationLabel.Tip(new ChatModeration(ChatModerationKind.Lift, "41", "alice", "Streamer", Reason: "спам", Lifted: ChatModerationKind.Ban)));
         Assert.True(ChatModerationLabel.IsActive(new ChatModeration(ChatModerationKind.Timeout, "41", "alice", "x", 60)));
         Assert.False(ChatModerationLabel.IsActive(new ChatModeration(ChatModerationKind.Lift, "41", "alice", "x")));
+    }
+}
+
+public class BanRefusalLogTests
+{
+    private static readonly AuthRequiredException Refused = new("Twitch не разрешил слушать эти события: подключи Twitch заново (нужны права …).");
+
+    [Fact]
+    public void A_refused_ban_event_on_someone_elses_channel_does_not_ask_to_reconnect()
+    {
+        var line = EventSubRefusal.Optional("Пинги", "channel.ban", ownChannel: false, Refused);
+
+        Assert.Equal("Twitch EventSub (Пинги): channel.ban is not available: " + EventSubRefusal.NotOwnChannelBans, line);
+        Assert.DoesNotContain("подключи Twitch заново", line);
+        Assert.Contains("только на своём канале", EventSubRefusal.Optional("Пинги", "channel.unban", ownChannel: false, Refused));
+    }
+
+    [Fact]
+    public void Other_refusals_keep_their_own_reason()
+    {
+        Assert.EndsWith(Refused.Message, EventSubRefusal.Optional("Пинги", "channel.ban", ownChannel: true, Refused));
+        Assert.EndsWith(Refused.Message, EventSubRefusal.Optional("Пинги", "channel.chat.clear", ownChannel: false, Refused));
+        Assert.EndsWith("(HTTP 429).", EventSubRefusal.Optional("Пинги", "channel.ban", ownChannel: false, new HttpRequestException("Twitch: слишком много запросов (HTTP 429).")));
     }
 }

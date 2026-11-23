@@ -51,12 +51,23 @@ public partial class ChatHistoryWindow : Window
     private readonly bool _canDelete;
     private readonly LinkPreviewCatalog? _previews;
     private readonly Func<bool> _previewsOn;
+    private readonly ChatArchive? _archive;
+    private readonly ArchiveStream? _stream;
+    private readonly HashSet<string> _archivedDeleted = new();
+    private readonly Dictionary<string, ChatModeration> _archivedModeration = new();
+    private readonly HashSet<string> _streamsShown = new();
+    private string? _lastSection;
+    private bool _allStreams;
+    private bool _loading;
+    private int _generation;
     private int _count;
 
     public ChatHistoryWindow(
         ChatFeed feed, ChatMessage sample, DateTime? sinceUtc, ChatEmotes emotes, IModerationApi moderation, bool canDelete = true,
-        LinkPreviewCatalog? previews = null, Func<bool>? previewsOn = null)
+        LinkPreviewCatalog? previews = null, Func<bool>? previewsOn = null, ChatArchive? archive = null, ArchiveStream? stream = null)
     {
+        _archive = archive;
+        _stream = archive != null ? stream : null;
         _animator = new EmoteAnimator(200) { Shows = Shown };
         InitializeComponent();
         _canDelete = canDelete;
@@ -82,14 +93,19 @@ public partial class ChatHistoryWindow : Window
         Box.Document = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Segoe UI"), FontSize = TextSize };
 
         _feed.Message += OnLive;
+        if (_archive != null)
+        {
+            _archive.Written += OnWritten;
+            ScopePanel.Visibility = Visibility.Visible;
+        }
         Closed += (_, _) =>
         {
             _feed.Message -= OnLive;
+            if (_archive != null) _archive.Written -= OnWritten;
             _animator.Stop();
             _disarm.Stop();
         };
-        foreach (var message in _feed.HistoryOf(_key, _sinceUtc)) Append(message);
-        UpdateCount();
+        Reload();
 
         Loaded += (_, _) =>
         {
@@ -100,6 +116,132 @@ public partial class ChatHistoryWindow : Window
     }
 
     public string ChatterKey => _key;
+
+    public bool ShowsAllStreams => _allStreams;
+
+    public int MessageCount => _count;
+
+    public Task? Loading { get; private set; }
+
+    private bool FromArchive => _allStreams || _stream != null;
+
+    private void OnScopeClick(object sender, RoutedEventArgs e)
+    {
+        var all = AllStreamsButton.IsChecked == true;
+        if (all == _allStreams) return;
+        ShowAllStreams(all);
+    }
+
+    public void ShowAllStreams(bool all)
+    {
+        _allStreams = all;
+        AllStreamsButton.IsChecked = all;
+        ThisStreamButton.IsChecked = !all;
+        Reload();
+    }
+
+    private void Clear()
+    {
+        Disarm();
+        Box.Document.Blocks.Clear();
+        _seen.Clear();
+        _byId.Clear();
+        _paragraphs.Clear();
+        _trash.Clear();
+        _archivedDeleted.Clear();
+        _archivedModeration.Clear();
+        _streamsShown.Clear();
+        _lastSection = null;
+        _count = 0;
+    }
+
+    private void Reload()
+    {
+        var generation = ++_generation;
+        Clear();
+        if (!FromArchive)
+        {
+            _loading = false;
+            foreach (var message in _feed.HistoryOf(_key, _sinceUtc)) Append(message);
+            UpdateCount();
+            Box.ScrollToEnd();
+            Loading = Task.CompletedTask;
+            return;
+        }
+        _loading = true;
+        CountText.Text = "Загружаю…";
+        Loading = LoadArchiveAsync(generation);
+    }
+
+    private async Task LoadArchiveAsync(int generation)
+    {
+        var archive = _archive!;
+        var key = _key;
+        var streamId = _allStreams ? null : _stream?.Id;
+        var found = await Task.Run(() => archive.MessagesOf(key, streamId));
+        if (generation != _generation) return;
+        _loading = false;
+        foreach (var item in found)
+        {
+            var id = item.Message.MessageId;
+            if (item.Deleted && id.Length > 0) _archivedDeleted.Add(id);
+            if (item.Moderation != null && id.Length > 0) _archivedModeration[id] = item.Moderation;
+            if (_allStreams) AddSection(item.Stream);
+            Append(item.Message);
+        }
+        UpdateCount();
+        Box.ScrollToEnd();
+    }
+
+    private void AddSection(ArchiveStream stream)
+    {
+        if (_lastSection == stream.Id) return;
+        _lastSection = stream.Id;
+        _streamsShown.Add(stream.Id);
+        var paragraph = new Paragraph { Margin = new Thickness(0, Box.Document.Blocks.Count == 0 ? 0 : 12, 0, 6) };
+        var text = ArchiveTimeline.StreamDate(stream) + " · " + ArchiveTimeline.StreamTime(stream, ReferenceEquals(_archive?.Open, stream));
+        paragraph.Inlines.Add(new Run(text) { Foreground = TimeBrush, FontSize = 12, FontWeight = FontWeights.SemiBold });
+        if (stream.Title.Trim().Length > 0) paragraph.Inlines.Add(new Run(" · " + stream.Title.Trim()) { Foreground = TimeBrush, FontSize = 12 });
+        Box.Document.Blocks.Add(paragraph);
+    }
+
+    private void OnWritten(string streamId, ArchiveLine line, bool update)
+    {
+        if (update) return;
+        if (line.Kind == ArchiveKind.Chat && line.Chat is { } message)
+        {
+            if (ChatFeed.KeyOf(message) != _key) return;
+            Dispatcher.InvokeAsync(async () =>
+            {
+                if (_loading || !FromArchive || !_allStreams && _stream?.Id != streamId) return;
+                await _emotes.PreloadAsync(message, EmoteWait);
+                if (_loading || !FromArchive) return;
+                var atEnd = AtEnd();
+                if (_allStreams && _archive?.Open is { } open && open.Id == streamId) AddSection(open);
+                if (!Append(message)) return;
+                UpdateCount();
+                if (atEnd) Box.ScrollToEnd();
+            });
+            return;
+        }
+        if (line.Kind is not (ArchiveKind.Deleted or ArchiveKind.Moderated) || line.Ids == null) return;
+        var ids = line.Ids;
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (!FromArchive) return;
+            foreach (var id in ids)
+            {
+                if (line.Kind == ArchiveKind.Deleted) _archivedDeleted.Add(id);
+                else if (line.Moderation != null) _archivedModeration[id] = line.Moderation;
+                ShowChanged(id);
+            }
+        });
+    }
+
+    private bool IsDeleted(string id) => id.Length > 0 && (_archivedDeleted.Contains(id) || _feed.IsDeleted(id));
+
+    private ChatModeration? ModerationOf(string id) =>
+        id.Length == 0 ? null : _feed.ModerationOf(id) ?? _archivedModeration.GetValueOrDefault(id);
 
     private bool Shown(Image image)
     {
@@ -134,8 +276,10 @@ public partial class ChatHistoryWindow : Window
         if (_sinceUtc != null && message.AtUtc < _sinceUtc) return;
         Dispatcher.InvokeAsync(async () =>
         {
+            if (FromArchive) return;
             var target = PreviewOf(message);
             await Task.WhenAll(_emotes.PreloadAsync(message, EmoteWait), target == null ? Task.CompletedTask : Task.WhenAny(_previews!.LoadAsync(target), Task.Delay(EmoteWait)));
+            if (FromArchive) return;
             var atEnd = AtEnd();
             if (!Append(message)) return;
             UpdateCount();
@@ -165,7 +309,7 @@ public partial class ChatHistoryWindow : Window
     private Paragraph BuildParagraph(ChatMessage message)
     {
         var id = message.MessageId;
-        var deleted = _feed.IsDeleted(id);
+        var deleted = IsDeleted(id);
         var paragraph = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
         if (message.Reply is { } parent)
         {
@@ -186,7 +330,7 @@ public partial class ChatHistoryWindow : Window
             paragraph.Inlines.Add(inline);
         }
         _trash.Remove(id);
-        var moderation = _feed.ModerationOf(id);
+        var moderation = ModerationOf(id);
         if (moderation != null)
         {
             paragraph.Inlines.Add(new Run("  ·\u00A0" + ChatModerationLabel.Unbroken(moderation)) { Foreground = DoneBrush, FontSize = 12, ToolTip = ChatModerationLabel.Tip(moderation) });
@@ -313,7 +457,11 @@ public partial class ChatHistoryWindow : Window
             result = new ModerationResult(false, "Ошибка: " + ex.Message);
         }
         _busy.Remove(id);
-        if (result.Success) _feed.MarkDeleted(id);
+        if (result.Success)
+        {
+            _archivedDeleted.Add(id);
+            _feed.MarkDeleted(id);
+        }
         else _errors[id] = result.Message;
         Refresh(message);
     }
@@ -362,7 +510,14 @@ public partial class ChatHistoryWindow : Window
     private void UpdateCount()
     {
         var text = "Сообщений: " + _count;
-        if (_sinceUtc is { } since) text += " · стрим с " + since.ToLocalTime().ToString("HH:mm");
+        if (_allStreams)
+        {
+            text += _streamsShown.Count > 0
+                ? $" · {_streamsShown.Count} {Models.Words.Plural(_streamsShown.Count, "стрим", "стрима", "стримов")} в архиве"
+                : " · в архиве ничего нет";
+        }
+        else if (_stream != null) text += " · стрим " + ArchiveTimeline.StreamDate(_stream) + ", " + _stream.StartUtc.ToLocalTime().ToString("HH:mm");
+        else if (_sinceUtc is { } since) text += " · стрим с " + since.ToLocalTime().ToString("HH:mm");
         CountText.Text = text;
     }
 

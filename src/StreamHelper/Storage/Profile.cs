@@ -155,6 +155,9 @@ public static class Profile
         nameof(AppSettings.PredictionSeconds),
         nameof(AppSettings.PollPointsVoting),
         nameof(AppSettings.PollPointsPerVote),
+        nameof(AppSettings.RecentStreamTitles),
+        nameof(AppSettings.ClipLinkToChat),
+        nameof(AppSettings.ArchiveEnabled),
     };
 
     public static string PendingPath(string dataDirectory) => Path.Combine(dataDirectory, PendingFileName);

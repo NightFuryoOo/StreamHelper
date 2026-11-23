@@ -23,7 +23,18 @@ public partial class SettingsWindow
         ChatPreviewsCheck.IsChecked = settings.ChatLinkPreviews;
         ChatGifsCheck.IsChecked = settings.ChatGifs;
         ChatTimeCheck.IsChecked = settings.ChatShowTime;
+        ArchiveCheck.IsChecked = settings.ArchiveEnabled;
     }
+
+    private void OnArchiveClick(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _services.Settings.Current.ArchiveEnabled = ArchiveCheck.IsChecked == true;
+        _services.Settings.Save();
+        _services.Archive.CheckSoon();
+    }
+
+    private void OnOpenArchiveClick(object sender, RoutedEventArgs e) => _services.OpenArchive();
 
     private void OnChatTimeClick(object sender, RoutedEventArgs e)
     {
